@@ -7,6 +7,8 @@ from skills.constructive import analyze_constructive, generate_constructive
 from skills.defense import generate_defense, generate_defense_followup
 from skills.questioning import generate_questioning, simulate_question_answer
 from skills.research import run_research_workflow
+from utils.agent_orchestrator import DEFAULT_WORKFLOW_STEPS, STEP_LABELS, run_debate_workflow
+from utils.debate_memory import DebateMemory
 from utils.docx_exporter import build_docx
 from utils.error_messages import explain_error
 from utils.openai_client import (
@@ -20,6 +22,7 @@ from utils.openai_client import (
 )
 from utils.research_client import get_default_tavily_key
 from utils.skill_catalog import SKILLS
+from utils.trace import TraceEvent
 
 
 st.set_page_config(page_title="辯論助理", page_icon="🎙️", layout="wide")
@@ -89,6 +92,7 @@ def initialize_state() -> None:
         "defense_dialogue": "",
         "closing": "",
         "closing_analysis": "",
+        "workflow_trace": [],
         "provider_model_options": {},
     }
     for key, value in defaults.items():
@@ -129,29 +133,21 @@ def build_llm_config(provider: str, model: str, api_key: str, base_url: str) -> 
     return LLMConfig(provider=provider, model=model, api_key=api_key, base_url=base_url)
 
 
+def current_memory(time_limit: str) -> DebateMemory:
+    return DebateMemory.from_state(st.session_state, time_limit)
+
+
+def apply_memory(memory: DebateMemory) -> None:
+    for key, value in memory.to_state_updates().items():
+        st.session_state[key] = value
+
+
 def combined_research_material() -> str:
-    parts = [
-        st.session_state.get("manual_material", ""),
-        st.session_state.get("search_material", ""),
-        st.session_state.get("research_summary", ""),
-    ]
-    return "\n\n".join(part for part in parts if part.strip())
+    return current_memory("").research_material()
 
 
 def combined_all_materials() -> str:
-    labeled_parts = {
-        "手動輸入資料": st.session_state.get("manual_material", ""),
-        "查詢資料": st.session_state.get("search_material", ""),
-        "資料整理": st.session_state.get("research_summary", ""),
-        "我方申論": st.session_state.get("constructive", ""),
-        "對方申論": st.session_state.get("opponent_constructive", ""),
-        "質詢設計": st.session_state.get("questioning", ""),
-        "質詢模擬": st.session_state.get("question_simulation", ""),
-        "質詢多輪紀錄": st.session_state.get("question_dialogue", ""),
-        "答辯內容": st.session_state.get("defense", ""),
-        "答辯多輪紀錄": st.session_state.get("defense_dialogue", ""),
-    }
-    return "\n\n".join(f"## {label}\n{value}" for label, value in labeled_parts.items() if value.strip())
+    return current_memory("").all_materials()
 
 
 def append_dialogue(existing: str, heading: str, content: str) -> str:
@@ -164,6 +160,34 @@ def append_dialogue(existing: str, heading: str, content: str) -> str:
 
 def display_prompt_template(prompt: str) -> str:
     return prompt.replace("{{", "{").replace("}}", "}")
+
+
+def add_trace(event: TraceEvent) -> None:
+    st.session_state.workflow_trace.append(event)
+
+
+def render_trace() -> None:
+    events = st.session_state.get("workflow_trace", [])
+    if not events:
+        st.info("尚未執行一鍵流程。")
+        return
+    status_labels = {
+        "running": "執行中",
+        "done": "完成",
+        "failed": "失敗",
+        "skipped": "略過",
+    }
+    for event in events:
+        status = status_labels.get(event.status, event.status)
+        st.markdown(f"- `{event.timestamp}` **{event.step}** · {status}：{event.message}")
+
+
+def trace_as_text() -> str:
+    events = st.session_state.get("workflow_trace", [])
+    return "\n".join(
+        f"- {event.timestamp} {event.step} [{event.status}] {event.message}"
+        for event in events
+    )
 
 
 def render_sources() -> None:
@@ -281,9 +305,61 @@ with st.sidebar:
             st.markdown("**Prompt：**")
             st.code(display_prompt_template(skill.prompt), language="text")
 
-tab_research, tab_constructive, tab_questioning, tab_defense, tab_closing, tab_export = st.tabs(
-    ["查詢資料", "申論", "質詢", "答辯", "結辯", "匯出"]
+tab_workflow, tab_research, tab_constructive, tab_questioning, tab_defense, tab_closing, tab_export = st.tabs(
+    ["一鍵流程", "查詢資料", "申論", "質詢", "答辯", "結辯", "匯出"]
 )
+
+with tab_workflow:
+    st.subheader("一鍵辯論準備流程")
+    st.caption("參考 multi-agent 的 coordinator 思路：依序執行選定 agent，並把結果寫回各分頁。")
+    col_setup, col_trace = st.columns([1, 1])
+    with col_setup:
+        selected_workflow_steps = st.multiselect(
+            "要執行的 agent 步驟",
+            DEFAULT_WORKFLOW_STEPS,
+            default=["research", "constructive", "questioning", "defense", "closing"],
+            format_func=lambda key: STEP_LABELS.get(key, key),
+            help="若不想消耗太多 API 額度，可以先只跑查詢資料、生成申論、生成質詢。",
+        )
+        workflow_time_range_label = st.selectbox(
+            "一鍵流程資料時間範圍",
+            ["不限", "過去一天", "過去一週", "過去一個月", "過去一年"],
+            index=0,
+        )
+        workflow_search_depth_label = st.selectbox(
+            "一鍵流程搜尋深度",
+            ["快速", "標準", "進階"],
+            index=1,
+        )
+        workflow_time_range_map = {
+            "不限": "",
+            "過去一天": "day",
+            "過去一週": "week",
+            "過去一個月": "month",
+            "過去一年": "year",
+        }
+        workflow_search_depth_map = {"快速": "fast", "標準": "basic", "進階": "advanced"}
+
+        if st.button("執行一鍵準備流程", use_container_width=True, type="primary"):
+            st.session_state.workflow_trace = []
+            try:
+                with st.spinner("Coordinator 正在依序執行 selected agents..."):
+                    memory = run_debate_workflow(
+                        current_memory(time_limit),
+                        selected_workflow_steps,
+                        llm_config,
+                        tavily_key,
+                        time_range=workflow_time_range_map[workflow_time_range_label],
+                        search_depth=workflow_search_depth_map[workflow_search_depth_label],
+                        logger=add_trace,
+                    )
+                    apply_memory(memory)
+                st.success("一鍵流程完成，結果已回填到各分頁。")
+            except Exception as exc:
+                show_actionable_error(exc, "一鍵流程失敗")
+    with col_trace:
+        st.markdown("### 流程追蹤")
+        render_trace()
 
 with tab_research:
     st.subheader("查詢資料")
@@ -537,6 +613,7 @@ with tab_closing:
 with tab_export:
     st.subheader("匯出")
     sections = {
+        "一鍵流程紀錄": trace_as_text(),
         "查詢資料": st.session_state.search_material,
         "資料整理": st.session_state.research_summary,
         "我方申論": st.session_state.constructive,
