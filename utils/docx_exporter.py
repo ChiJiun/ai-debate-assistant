@@ -28,9 +28,9 @@ def _add_markdownish_text(document: Document, text: str) -> None:
 
 def build_docx(settings: Mapping[str, str], sections: Mapping[str, str]) -> BytesIO:
     document = Document()
-    document.add_heading("Debate Assistant Preparation", level=0)
+    document.add_heading("辯論助理準備資料", level=0)
 
-    document.add_heading("User Settings", level=1)
+    document.add_heading("基本設定", level=1)
     for label, value in settings.items():
         document.add_paragraph(f"{label}: {value}")
 

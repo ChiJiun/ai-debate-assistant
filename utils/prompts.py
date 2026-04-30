@@ -36,3 +36,30 @@ def base_context(motion: str, side: str, time_limit: str, output_style: str) -> 
 
 def section_prompt(context: str, task: str) -> str:
     return f"{context}\n\nTask:\n{task.strip()}"
+
+
+def opponent_side(side: str) -> str:
+    if side == "正方":
+        return "反方"
+    if side == "反方":
+        return "正方"
+    return "對方"
+
+
+def debate_context(motion: str, side: str, time_limit: str | None = None) -> str:
+    time_text = f"\n        發言時間限制：{time_limit}" if time_limit else ""
+    return dedent(
+        f"""
+        你是專業辯論教練，正在協助使用者準備辯論。
+        請使用繁體中文，語氣清楚、具體、實用。
+
+        辯題：{motion}
+        使用者立場：{side}{time_text}
+
+        原則：
+        - 區分事實、推論與策略建議。
+        - 不要捏造數據、研究、法條或來源。
+        - 若資料不足，請明確說明，並提出可查證方向。
+        - 內容要能直接幫助使用者練習申論、質詢、答辯與結辯。
+        """
+    ).strip()
