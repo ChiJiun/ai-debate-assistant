@@ -11,6 +11,7 @@
 ## 功能說明
 
 側邊欄提供 `Skills` 區塊，可以查看每個功能目前使用的 prompt，以及該 skill 的主要功用。
+各 skill prompt 依照 Google Prompting 101 的角色、任務、背景、格式四要素設計，並加入避免捏造資料、資料不足需明確說明等共同規則。
 
 ### 1. 查詢資料
 
@@ -18,7 +19,7 @@
 - 一鍵自動查資料：LLM 產生乾淨搜尋關鍵字，Tavily 依照關鍵字上網查資料，LLM 再整理結果
 - 整理資料摘要
 - 區分正方可用資料、反方可用資料與可查證的證據方向
-- 查詢結果只顯示標題、連結與簡短摘要；完整分析交給 LLM 整理
+- 保留來源連結，匯出時可一起放入 Word 文件
 
 ### 2. 申論
 
@@ -83,17 +84,6 @@
 Gemini / Google AI Studio
 gemini-2.5-flash-lite
 ```
-
-適合本 app 的 Google AI Studio / Gemini API 免費文字模型選項：
-
-```text
-gemini-2.5-flash-lite
-gemini-2.5-flash
-gemini-2.0-flash-lite
-gemini-2.0-flash
-```
-
-Gemini 2 系列的模型 ID 使用 `2.0`，例如 `gemini-2.0-flash`，不是 `gemini-2-flash`。
 
 Ollama 是本機模型，不需要 API key。其他線上 provider 通常需要使用者自行提供 API key。
 
