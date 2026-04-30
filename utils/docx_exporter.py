@@ -6,9 +6,18 @@ from typing import Mapping
 from docx import Document
 
 
+def _clean_docx_text(value: object) -> str:
+    text = str(value)
+    return "".join(
+        char
+        for char in text
+        if char in "\t\n\r" or ord(char) >= 0x20
+    )
+
+
 def _add_markdownish_text(document: Document, text: str) -> None:
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
+    for raw_line in _clean_docx_text(text).splitlines():
+        line = _clean_docx_text(raw_line).strip()
         if not line:
             continue
 
@@ -32,10 +41,10 @@ def build_docx(settings: Mapping[str, str], sections: Mapping[str, str]) -> Byte
 
     document.add_heading("基本設定", level=1)
     for label, value in settings.items():
-        document.add_paragraph(f"{label}: {value}")
+        document.add_paragraph(_clean_docx_text(f"{label}: {value}"))
 
     for title, content in sections.items():
-        document.add_heading(title, level=1)
+        document.add_heading(_clean_docx_text(title), level=1)
         _add_markdownish_text(document, content)
 
     buffer = BytesIO()
