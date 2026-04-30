@@ -89,11 +89,10 @@ def initialize_state() -> None:
 
 
 def show_actionable_error(error: Exception, context: str) -> None:
-    title, suggestion = explain_error(error)
+    title, explanation, suggestion = explain_error(error)
     with st.error(f"{context}：{title}"):
-        st.write(suggestion)
-        with st.expander("技術細節"):
-            st.code(str(error))
+        st.markdown(f"**錯誤說明：** {explanation}")
+        st.markdown(f"**建議處理方式：** {suggestion}")
 
 
 def render_google_ai_studio_guide() -> None:
