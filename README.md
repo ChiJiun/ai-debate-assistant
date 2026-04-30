@@ -7,8 +7,9 @@ A simple Streamlit web app that helps users prepare debate materials quickly and
 - Debate motion input
 - Side options: 正方, 反方, 雙方
 - Time limits: 1 分鐘, 2 分鐘, 3 分鐘
-- Output styles: 正式辯論, 課堂報告, 簡短口語
+- Debate assistant output tone
 - Fast generation mode
+- Research mode is reserved for later; the current MVP does not browse the web
 - Motion analysis
 - Arguments for both sides
 - Constructive speeches

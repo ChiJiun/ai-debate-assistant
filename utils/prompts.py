@@ -4,6 +4,7 @@ from textwrap import dedent
 
 
 STYLE_GUIDE = {
+    "辯論助理": "Use a clear, practical debate-coach tone for preparation, speeches, attacks, defense, and judging strategy.",
     "正式辯論": "Use a structured, persuasive formal debate tone.",
     "課堂報告": "Use a clear classroom presentation tone with accessible explanations.",
     "簡短口語": "Use concise, natural spoken language that is easy to deliver.",
@@ -11,7 +12,7 @@ STYLE_GUIDE = {
 
 
 def base_context(motion: str, side: str, time_limit: str, output_style: str) -> str:
-    style_instruction = STYLE_GUIDE.get(output_style, STYLE_GUIDE["正式辯論"])
+    style_instruction = STYLE_GUIDE.get(output_style, STYLE_GUIDE["辯論助理"])
     return dedent(
         f"""
         You are an expert debate coach helping students prepare quickly.

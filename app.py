@@ -288,8 +288,10 @@ with st.sidebar:
     st.header("Settings")
     side = st.radio("Side option", ["正方", "反方", "雙方"], index=2)
     time_limit = st.selectbox("Time limit", ["1 分鐘", "2 分鐘", "3 分鐘"], index=1)
-    output_style = st.selectbox("Output style", ["正式辯論", "課堂報告", "簡短口語"])
-    research_mode = st.selectbox("Research mode", ["快速生成，不查資料", "之後保留：查資料模式"])
+    output_style = "辯論助理"
+    st.caption("輸出風格固定為辯論助理：清楚、實用，適合準備攻防與講稿。")
+    research_mode = st.selectbox("Research mode", ["快速生成，不上網查資料", "保留功能：上網查資料"])
+    st.caption("目前不會自動上網查資料；模型只會根據辯題與 prompt 產生準備方向。")
 
     st.header("LLM")
     providers = ["OpenAI", "Gemini", "Claude", "Grok", "DeepSeek", "Qwen", "OpenRouter", "Ollama"]
@@ -405,8 +407,8 @@ motion = st.text_area(
 
 generate_clicked = st.button("Generate Debate Materials", type="primary", use_container_width=True)
 
-if research_mode != "快速生成，不查資料":
-    st.info("查資料模式已保留為後續功能；目前 MVP 會使用快速生成模式。")
+if research_mode != "快速生成，不上網查資料":
+    st.info("上網查資料模式目前尚未實作；這次仍會用快速生成，不會真的連網搜尋資料。")
 
 if generate_clicked:
     if not motion.strip():
@@ -418,7 +420,7 @@ if generate_clicked:
             "Motion": motion.strip(),
             "Side": side,
             "Time Limit": time_limit,
-            "Output Style": output_style,
+            "Output Style": "辯論助理",
             "Research Mode": research_mode,
             "LLM Provider": provider,
             "Model": model,
