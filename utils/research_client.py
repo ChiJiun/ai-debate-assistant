@@ -73,16 +73,3 @@ def format_search_results(results: list[SearchResult]) -> str:
         lines.append(f"摘要: {result.content}")
         lines.append("")
     return "\n".join(lines).strip()
-
-
-def extract_search_queries(raw_text: str) -> list[str]:
-    queries: list[str] = []
-    for raw_line in raw_text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        line = line.removeprefix("-").removeprefix("*").strip()
-        if line.startswith("#") or len(line) < 3:
-            continue
-        queries.append(line)
-    return queries

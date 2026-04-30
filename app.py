@@ -6,7 +6,7 @@ from skills.closing import analyze_closing, generate_closing
 from skills.constructive import analyze_constructive, generate_constructive
 from skills.defense import analyze_defense, generate_defense
 from skills.questioning import generate_questioning, simulate_question_answer
-from skills.research import plan_search_queries, summarize_research
+from skills.research import run_research_workflow
 from utils.docx_exporter import build_docx
 from utils.error_messages import explain_error
 from utils.openai_client import (
@@ -18,7 +18,7 @@ from utils.openai_client import (
     get_default_api_key,
     list_available_models,
 )
-from utils.research_client import extract_search_queries, format_search_results, get_default_tavily_key, search_tavily
+from utils.research_client import get_default_tavily_key
 
 
 st.set_page_config(page_title="辯論助理", page_icon="🎙️", layout="wide")
@@ -69,7 +69,6 @@ def initialize_state() -> None:
         "motion": "政府應/不應平衡其預算",
         "side": "正方",
         "manual_material": "",
-        "search_plan": "",
         "search_queries": "",
         "search_material": "",
         "research_summary": "",
@@ -213,9 +212,9 @@ with st.sidebar:
             """
             1. 到 Tavily 註冊並建立 API key。
             2. 將 key 貼到上方欄位。
-            3. 到「查詢資料」分頁，先點 **分析辯題並產生搜尋關鍵字**。
-            4. 檢查或修改關鍵字後，點 **上網查資料（Tavily）**。
-            5. 最後點 **整理查詢結果**，讓 LLM 將來源整理成正反方可用素材。
+            3. 到「查詢資料」分頁調整搜尋數量、時間範圍與搜尋深度。
+            4. 點 **自動查資料並整理**。
+            5. 系統會讓 LLM 產生乾淨關鍵字，交給 Tavily 搜尋，再由 LLM 整理正反方素材。
 
             Tavily 負責搜尋網路，LLM 負責整理、分析與生成辯論內容。
             """
@@ -234,34 +233,14 @@ with tab_research:
         value=st.session_state.manual_material,
         height=180,
     )
-    st.caption("建議流程：先讓 LLM 分析辯題產生關鍵字，再用 Tavily 搜尋，最後整理搜尋結果。")
-
-    if st.button("1. 分析辯題並產生搜尋關鍵字", use_container_width=True):
-        try:
-            st.session_state.search_plan = plan_search_queries(
-                st.session_state.motion,
-                st.session_state.side,
-                st.session_state.manual_material,
-                llm_config,
-            )
-            query_lines = [
-                line.strip().removeprefix("-").strip()
-                for line in st.session_state.search_plan.splitlines()
-                if line.strip().startswith("-")
-            ]
-            st.session_state.search_queries = "\n".join(query_lines) or st.session_state.motion
-            st.success("已產生搜尋策略與關鍵字。")
-        except Exception as exc:
-            show_actionable_error(exc, "產生搜尋關鍵字失敗")
-
-    if st.session_state.search_plan:
-        with st.expander("LLM 搜尋策略", expanded=False):
-            st.markdown(st.session_state.search_plan)
-
-    st.session_state.search_queries = st.text_area(
-        "搜尋關鍵字（每行一組，可自行修改）",
-        value=st.session_state.search_queries or st.session_state.motion,
-        height=140,
+    st.caption("自動流程：LLM 只產生搜尋關鍵字 → Tavily 搜尋 → LLM 整理查詢結果。")
+    query_count = st.number_input(
+        "LLM 產生搜尋關鍵字數量",
+        min_value=1,
+        max_value=10,
+        value=5,
+        step=1,
+        help="LLM 會產生幾組乾淨關鍵字交給 Tavily 搜尋。",
     )
     max_results = st.number_input(
         "每組關鍵字搜尋結果數量",
@@ -289,44 +268,31 @@ with tab_research:
     )
     search_depth_map = {"快速": "fast", "標準": "basic", "進階": "advanced"}
 
-    col_search, col_summarize = st.columns(2)
-    with col_search:
-        if st.button("2. 上網查資料（Tavily）", use_container_width=True):
-            try:
-                queries = extract_search_queries(st.session_state.search_queries)
-                all_results = []
-                material_parts = []
-                for query in queries:
-                    results = search_tavily(
-                        query,
-                        tavily_key,
-                        max_results=max_results,
-                        time_range=time_range_map[time_range_label],
-                        search_depth=search_depth_map[search_depth_label],
-                    )
-                    all_results.extend(results)
-                    material_parts.append(f"## 查詢：{query}\n{format_search_results(results)}")
-                st.session_state.search_material = "\n\n".join(material_parts)
-                st.session_state.sources_text = "\n".join(
-                    f"- [{result.title}]({result.url})" for result in all_results if result.url
-                )
-                st.success(f"查詢完成，共搜尋 {len(queries)} 組關鍵字。")
-            except Exception as exc:
-                show_actionable_error(exc, "查資料失敗")
-
-    with col_summarize:
-        if st.button("3. 整理查詢結果", use_container_width=True):
-            try:
-                st.session_state.research_summary = summarize_research(
+    if st.button("自動查資料並整理", use_container_width=True, type="primary"):
+        try:
+            with st.spinner("正在產生搜尋關鍵字、查詢資料並整理結果..."):
+                queries, search_material, sources_text, summary = run_research_workflow(
                     st.session_state.motion,
                     st.session_state.side,
-                    combined_research_material(),
+                    st.session_state.manual_material,
                     llm_config,
+                    tavily_key,
+                    query_count=int(query_count),
+                    max_results=int(max_results),
+                    time_range=time_range_map[time_range_label],
+                    search_depth=search_depth_map[search_depth_label],
                 )
-                st.success("資料整理完成。")
-            except Exception as exc:
-                show_actionable_error(exc, "整理資料失敗")
+                st.session_state.search_queries = queries
+                st.session_state.search_material = search_material
+                st.session_state.sources_text = sources_text
+                st.session_state.research_summary = summary
+            st.success("自動查資料與整理完成。")
+        except Exception as exc:
+            show_actionable_error(exc, "自動查資料失敗")
 
+    if st.session_state.search_queries:
+        with st.expander("LLM 提供給 Tavily 的搜尋關鍵字", expanded=False):
+            st.code(st.session_state.search_queries)
     if st.session_state.search_material:
         st.markdown("### 查詢結果")
         st.markdown(st.session_state.search_material)
