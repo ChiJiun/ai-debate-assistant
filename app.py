@@ -1,0 +1,267 @@
+from __future__ import annotations
+
+import streamlit as st
+
+from skills.argument_generation import generate_arguments
+from skills.closing import generate_closing_speeches
+from skills.constructive_speech import generate_constructive_speeches
+from skills.cross_examination import generate_cross_examination
+from skills.defense import generate_defense_answers
+from skills.motion_analysis import generate_motion_analysis
+from utils.docx_exporter import build_docx
+from utils.openai_client import DEFAULT_MODELS, LLMConfig, OpenAIConfigError, get_default_api_key
+from utils.skill_templates import DEFAULT_SKILL_TEMPLATES, templates_from_json, templates_to_json
+
+
+st.set_page_config(page_title="Debate Assistant", page_icon="🎙️", layout="wide")
+
+
+SECTION_LABELS = {
+    "motion_analysis": "Motion Analysis",
+    "arguments": "Affirmative and Negative Materials",
+    "constructive": "Constructive Speeches",
+    "cross_examination": "Cross-Examination",
+    "defense": "Defense Answers",
+    "closing": "Closing Speeches",
+}
+
+MODEL_OPTIONS = {
+    "OpenAI": ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
+    "Gemini": ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+    "Claude": ["claude-3-5-haiku-latest", "claude-3-5-sonnet-latest", "claude-3-opus-latest"],
+    "OpenRouter": [
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "google/gemma-2-9b-it:free",
+        "mistralai/mistral-7b-instruct:free",
+        "deepseek/deepseek-chat",
+    ],
+    "Ollama": ["llama3.1", "llama3.2", "mistral", "qwen2.5", "gemma2"],
+}
+
+
+def initialize_state() -> None:
+    st.session_state.setdefault("generated_sections", {})
+    st.session_state.setdefault("last_settings", {})
+    for key, value in DEFAULT_SKILL_TEMPLATES.items():
+        st.session_state.setdefault(f"skill_template_{key}", value)
+
+
+def generate_all(
+    motion: str,
+    side: str,
+    time_limit: str,
+    output_style: str,
+    llm_config: LLMConfig,
+    skill_templates: dict[str, str],
+) -> dict[str, str]:
+    sections: dict[str, str] = {}
+
+    progress = st.progress(0, text="Analyzing motion...")
+    sections["motion_analysis"] = generate_motion_analysis(
+        motion,
+        side,
+        time_limit,
+        output_style,
+        llm_config,
+        skill_templates,
+    )
+
+    progress.progress(17, text="Building arguments...")
+    sections["arguments"] = generate_arguments(motion, side, time_limit, output_style, llm_config, skill_templates)
+
+    progress.progress(34, text="Writing constructive speeches...")
+    sections["constructive"] = generate_constructive_speeches(
+        motion,
+        side,
+        time_limit,
+        output_style,
+        llm_config,
+        skill_templates,
+    )
+
+    progress.progress(51, text="Preparing cross-examination...")
+    sections["cross_examination"] = generate_cross_examination(
+        motion,
+        side,
+        time_limit,
+        output_style,
+        llm_config,
+        skill_templates,
+    )
+
+    progress.progress(68, text="Drafting defense answers...")
+    sections["defense"] = generate_defense_answers(motion, side, time_limit, output_style, llm_config, skill_templates)
+
+    previous_materials = "\n\n".join(sections.values())
+    progress.progress(85, text="Writing closing speeches...")
+    sections["closing"] = generate_closing_speeches(
+        motion,
+        side,
+        time_limit,
+        output_style,
+        previous_materials,
+        llm_config,
+        skill_templates,
+    )
+
+    progress.progress(100, text="Done.")
+    return sections
+
+
+def render_sections(sections: dict[str, str]) -> None:
+    for key, title in SECTION_LABELS.items():
+        with st.expander(title, expanded=True):
+            st.markdown(sections.get(key, ""))
+
+
+def get_current_skill_templates() -> dict[str, str]:
+    return {
+        key: st.session_state.get(f"skill_template_{key}", value)
+        for key, value in DEFAULT_SKILL_TEMPLATES.items()
+    }
+
+
+initialize_state()
+
+st.title("Debate Assistant")
+st.caption("快速產生辯題分析、攻防素材、質詢題、結辯稿，並匯出 Word 文件。")
+
+with st.sidebar:
+    st.header("Settings")
+    side = st.radio("Side option", ["正方", "反方", "雙方"], index=2)
+    time_limit = st.selectbox("Time limit", ["1 分鐘", "2 分鐘", "3 分鐘"], index=1)
+    output_style = st.selectbox("Output style", ["正式辯論", "課堂報告", "簡短口語"])
+    research_mode = st.selectbox("Research mode", ["快速生成，不查資料", "之後保留：查資料模式"])
+
+    st.header("LLM")
+    provider = st.selectbox("Provider", ["OpenAI", "Gemini", "Claude", "OpenRouter", "Ollama"])
+    model_choices = MODEL_OPTIONS[provider] + ["Custom model"]
+    selected_model = st.selectbox("Model", model_choices)
+    custom_model = ""
+    if selected_model == "Custom model":
+        custom_model = st.text_input("Custom model name", value=DEFAULT_MODELS.get(provider, ""))
+    model = custom_model.strip() or selected_model
+
+    default_key = get_default_api_key(provider)
+    api_key = ""
+    if provider != "Ollama":
+        api_key = st.text_input(
+            "API key",
+            value="",
+            type="password",
+            placeholder="Paste key here, or leave blank to use .env",
+        )
+        if default_key:
+            st.caption("A default key is available from `.env`; this field can override it.")
+    else:
+        st.caption("Ollama uses a local server and does not require an API key.")
+
+    base_url = ""
+    if provider in {"OpenRouter", "Ollama"}:
+        default_base_url = "https://openrouter.ai/api/v1" if provider == "OpenRouter" else "http://localhost:11434"
+        base_url = st.text_input("Base URL", value=default_base_url)
+
+    st.header("Skills")
+    uploaded_skill_file = st.file_uploader("Import skill JSON", type=["json"])
+    if uploaded_skill_file is not None:
+        try:
+            imported_templates = templates_from_json(uploaded_skill_file.getvalue().decode("utf-8"))
+            for key, value in imported_templates.items():
+                st.session_state[f"skill_template_{key}"] = value
+            st.success("Skill templates imported.")
+        except Exception as exc:
+            st.error(f"Import failed: {exc}")
+
+    if st.button("Reset skills to default", use_container_width=True):
+        for key, value in DEFAULT_SKILL_TEMPLATES.items():
+            st.session_state[f"skill_template_{key}"] = value
+        st.rerun()
+
+    with st.expander("Customize generation skills"):
+        for key, title in SECTION_LABELS.items():
+            st.text_area(
+                title,
+                key=f"skill_template_{key}",
+                height=180,
+                help="Edit the instruction used for this generated section.",
+            )
+        st.caption("Closing skill can use `{previous_materials}` to insert earlier generated sections.")
+
+    st.download_button(
+        "Download skill JSON",
+        data=templates_to_json(get_current_skill_templates()),
+        file_name="debate-assistant-skills.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+
+motion = st.text_area(
+    "Debate motion",
+    placeholder="例如：本院認為高中應禁止學生使用智慧型手機",
+    height=110,
+)
+
+generate_clicked = st.button("Generate Debate Materials", type="primary", use_container_width=True)
+
+if research_mode != "快速生成，不查資料":
+    st.info("查資料模式已保留為後續功能；目前 MVP 會使用快速生成模式。")
+
+if generate_clicked:
+    if not motion.strip():
+        st.warning("Please enter a debate motion first.")
+    else:
+        settings = {
+            "Motion": motion.strip(),
+            "Side": side,
+            "Time Limit": time_limit,
+            "Output Style": output_style,
+            "Research Mode": research_mode,
+            "LLM Provider": provider,
+            "Model": model,
+            "Skill Template": "Customizable JSON",
+        }
+        llm_config = LLMConfig(
+            provider=provider,
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+        )
+        try:
+            with st.spinner("Generating debate materials..."):
+                st.session_state.generated_sections = generate_all(
+                    motion.strip(),
+                    side,
+                    time_limit,
+                    output_style,
+                    llm_config,
+                    get_current_skill_templates(),
+                )
+                st.session_state.last_settings = settings
+            st.success("Debate materials generated.")
+        except OpenAIConfigError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Generation failed: {exc}")
+
+if st.session_state.generated_sections:
+    render_sections(st.session_state.generated_sections)
+
+    docx_sections = {
+        SECTION_LABELS[key]: value
+        for key, value in st.session_state.generated_sections.items()
+    }
+    docx_file = build_docx(st.session_state.last_settings, docx_sections)
+    st.download_button(
+        "Download DOCX",
+        data=docx_file,
+        file_name="debate-preparation.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        use_container_width=True,
+    )
+else:
+    st.markdown(
+        """
+        Enter a motion, choose the preparation settings, and generate a complete debate pack.
+        The DOCX export appears after generation.
+        """
+    )
