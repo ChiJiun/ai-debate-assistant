@@ -12,6 +12,7 @@ from utils.docx_exporter import build_docx
 from utils.openai_client import (
     DEFAULT_BASE_URLS,
     DEFAULT_MODELS,
+    DEFAULT_PROVIDER,
     LLMConfig,
     OpenAIConfigError,
     get_default_api_key,
