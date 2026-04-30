@@ -22,6 +22,7 @@ A simple Streamlit web app that helps users prepare debate materials quickly and
 - Customizable generation skills
 - Skill JSON import and download
 - Built-in guide page for free Google AI Studio / Gemini API usage
+- Actionable API error explanations with retry/key/model suggestions
 
 ## Supported LLM Providers
 

@@ -9,6 +9,7 @@ from skills.cross_examination import generate_cross_examination
 from skills.defense import generate_defense_answers
 from skills.motion_analysis import generate_motion_analysis
 from utils.docx_exporter import build_docx
+from utils.error_messages import explain_error
 from utils.openai_client import (
     DEFAULT_BASE_URLS,
     DEFAULT_MODELS,
@@ -219,6 +220,14 @@ def get_current_skill_templates() -> dict[str, str]:
     }
 
 
+def show_actionable_error(error: Exception, context: str) -> None:
+    title, suggestion = explain_error(error)
+    with st.error(f"{context}: {title}"):
+        st.write(suggestion)
+        with st.expander("Technical details"):
+            st.code(str(error))
+
+
 initialize_state()
 
 st.title("Debate Assistant")
@@ -288,7 +297,7 @@ with st.sidebar:
             else:
                 st.warning("No compatible text-generation models were returned.")
         except Exception as exc:
-            st.error(f"Could not refresh models: {exc}")
+            show_actionable_error(exc, "Could not refresh models")
 
     provider_models = st.session_state.provider_model_options.get(provider, MODEL_OPTIONS[provider])
     model_choices = provider_models + ["Custom model"]
@@ -380,9 +389,9 @@ if generate_clicked:
                 st.session_state.last_settings = settings
             st.success("Debate materials generated.")
         except OpenAIConfigError as exc:
-            st.error(str(exc))
+            show_actionable_error(exc, "Generation failed")
         except Exception as exc:
-            st.error(f"Generation failed: {exc}")
+            show_actionable_error(exc, "Generation failed")
 
 if st.session_state.generated_sections:
     render_sections(st.session_state.generated_sections)
