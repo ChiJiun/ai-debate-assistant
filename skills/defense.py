@@ -21,12 +21,16 @@ def generate_defense(
     可用資料：
     {source_material or "無"}
 
+    答辯以一來一回的短回答為主，不要寫成完整申論稿。
+
     請輸出：
     ## 防守策略
-    ## 15 到 30 秒回答
+    ## 一來一回答辯
+    - 對方問：
+    - 我方答：用 2 到 4 句回答，控制在 15 到 30 秒
+    - 對方可能追問：
+    - 我方再答：
     ## 轉回己方主線的一句話
-    ## 對方可能追問
-    ## 追問應對
     """
     return generate_text(section_prompt(context, task), llm_config=llm_config)
 

@@ -155,7 +155,8 @@ with st.sidebar:
     st.header("基本設定")
     motion = st.text_area("辯題", key="motion", height=90)
     side = st.radio("你的立場", ["正方", "反方"], key="side", horizontal=True)
-    time_limit = st.selectbox("講稿時間", ["1 分鐘", "2 分鐘", "3 分鐘"], index=1)
+    time_limit = st.selectbox("申論與結辯時間", ["1 分鐘", "2 分鐘", "3 分鐘"], index=2)
+    st.caption("時間設定只套用在申論稿與結辯稿；質詢與答辯以一來一回的短問答為主。")
 
     st.header("LLM 設定")
     providers = ["OpenAI", "Gemini", "Claude", "Grok", "DeepSeek", "Qwen", "OpenRouter", "Ollama"]
@@ -372,6 +373,7 @@ with tab_closing:
                 st.session_state.closing = generate_closing(
                     st.session_state.motion,
                     st.session_state.side,
+                    time_limit,
                     closing_materials,
                     llm_config,
                 )

@@ -7,10 +7,11 @@ from utils.prompts import debate_context, section_prompt
 def generate_closing(
     motion: str,
     side: str,
+    time_limit: str,
     materials: str,
     llm_config: LLMConfig,
 ) -> str:
-    context = debate_context(motion, side)
+    context = debate_context(motion, side, time_limit)
     task = f"""
     使用者是「{side}」。請根據以下資訊生成結辯稿。
 
@@ -24,6 +25,8 @@ def generate_closing(
     - 我方為何勝出
     - 最重要的證據或推理
     - 最後結論
+
+    請符合時間限制，寫成可直接上台使用的完整結辯稿。
     """
     return generate_text(section_prompt(context, task), llm_config=llm_config, temperature=0.45)
 
