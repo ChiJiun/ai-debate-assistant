@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from utils.openai_client import LLMConfig, generate_text
 from utils.prompts import debate_context, section_prompt
+from utils.skill_catalog import get_skill_prompt
 
 
 def generate_closing(
@@ -12,22 +13,11 @@ def generate_closing(
     llm_config: LLMConfig,
 ) -> str:
     context = debate_context(motion, side, time_limit)
-    task = f"""
-    使用者是「{side}」。請根據以下資訊生成結辯稿。
-
-    可用資訊：
-    {materials or "沒有額外資訊，請根據辯題本身生成。"}
-
-    請輸出：
-    ## 結辯稿
-    - 主要爭點整理
-    - 對方讓步或矛盾
-    - 我方為何勝出
-    - 最重要的證據或推理
-    - 最後結論
-
-    請符合時間限制，寫成可直接上台使用的完整結辯稿。
-    """
+    task = get_skill_prompt(
+        "closing_generate",
+        side=side,
+        materials=materials or "沒有額外資訊，請根據辯題本身生成。",
+    )
     return generate_text(section_prompt(context, task), llm_config=llm_config, temperature=0.45)
 
 
@@ -39,20 +29,9 @@ def analyze_closing(
     llm_config: LLMConfig,
 ) -> str:
     context = debate_context(motion, side)
-    task = f"""
-    分析以下結辯稿。
-
-    結辯稿：
-    {closing_speech}
-
-    可參考資訊：
-    {materials or "無"}
-
-    請輸出：
-    ## 是否抓住主要爭點
-    ## 是否比較雙方
-    ## 是否說清楚我方為何勝
-    ## 遺漏的關鍵內容
-    ## 建議改寫版本
-    """
+    task = get_skill_prompt(
+        "closing_analyze",
+        closing_speech=closing_speech,
+        materials=materials or "無",
+    )
     return generate_text(section_prompt(context, task), llm_config=llm_config)

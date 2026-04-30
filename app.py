@@ -19,6 +19,7 @@ from utils.openai_client import (
     list_available_models,
 )
 from utils.research_client import get_default_tavily_key
+from utils.skill_catalog import SKILLS
 
 
 st.set_page_config(page_title="辯論助理", page_icon="🎙️", layout="wide")
@@ -220,6 +221,14 @@ with st.sidebar:
         )
     if get_default_tavily_key():
         st.caption("已偵測到部署環境或 .env 有 Tavily key。")
+
+    st.header("Skills")
+    st.caption("這裡顯示各功能目前使用的 prompt 與主要用途。")
+    for skill in SKILLS.values():
+        with st.expander(skill.name, expanded=False):
+            st.markdown(f"**主要功用：** {skill.purpose}")
+            st.markdown("**Prompt：**")
+            st.code(skill.prompt, language="text")
 
 tab_research, tab_constructive, tab_questioning, tab_defense, tab_closing, tab_export = st.tabs(
     ["查詢資料", "申論", "質詢", "答辯", "結辯", "匯出"]

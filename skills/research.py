@@ -3,6 +3,7 @@ from __future__ import annotations
 from utils.openai_client import LLMConfig, generate_text
 from utils.prompts import debate_context, section_prompt
 from utils.research_client import format_search_results, search_tavily
+from utils.skill_catalog import get_skill_prompt
 
 
 def generate_search_queries(
@@ -12,22 +13,7 @@ def generate_search_queries(
     llm_config: LLMConfig,
 ) -> str:
     context = debate_context(motion, side)
-    task = f"""
-    請根據辯題與使用者資料，產生適合交給 Tavily 搜尋 API 的搜尋關鍵字。
-
-    使用者資料：
-    {user_material or "無"}
-
-    請自行判斷需要搜尋幾組關鍵字，通常 3 到 7 組即可。
-    請只輸出搜尋關鍵字。
-    不要輸出分析、標題、編號、Markdown、解釋或其他文字。
-
-    要求：
-    - 關鍵字要具體、可查證
-    - 同時涵蓋正反方需要的事實問題
-    - 可混合中文與英文
-    - 每行一組搜尋字串
-    """
+    task = get_skill_prompt("research_queries", user_material=user_material or "無")
     return generate_text(section_prompt(context, task), llm_config=llm_config)
 
 
@@ -38,21 +24,7 @@ def summarize_research(
     llm_config: LLMConfig,
 ) -> str:
     context = debate_context(motion, side)
-    task = f"""
-    整理以下資料，幫助使用者準備辯論。
-
-    資料：
-    {source_material}
-
-    請輸出：
-    ## 資料摘要
-    ## 正方可用資料
-    ## 反方可用資料
-    ## 可查證的證據方向
-    ## 需要小心的資料限制
-
-    不要捏造資料、數據或來源。若資料不足，請明確說明不足。
-    """
+    task = get_skill_prompt("research_summary", source_material=source_material)
     return generate_text(section_prompt(context, task), llm_config=llm_config)
 
 
