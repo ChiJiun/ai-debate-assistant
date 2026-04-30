@@ -233,7 +233,21 @@ initialize_state()
 st.title("Debate Assistant")
 st.caption("快速產生辯題分析、攻防素材、質詢題、結辯稿，並匯出 Word 文件。")
 
+st.info("第一次使用 Gemini / Google AI Studio？請先看免費使用教學。")
+st.page_link(
+    "pages/1_Free_Google_AI_Studio_Guide.py",
+    label="Open Google AI Studio Free Guide",
+    icon="📘",
+)
+
 with st.sidebar:
+    st.page_link(
+        "pages/1_Free_Google_AI_Studio_Guide.py",
+        label="Google AI Studio Free Guide",
+        icon="📘",
+    )
+    st.divider()
+
     st.header("Settings")
     side = st.radio("Side option", ["正方", "反方", "雙方"], index=2)
     time_limit = st.selectbox("Time limit", ["1 分鐘", "2 分鐘", "3 分鐘"], index=1)
