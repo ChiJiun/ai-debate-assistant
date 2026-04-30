@@ -199,6 +199,19 @@ with st.sidebar:
 
     st.header("查資料設定")
     tavily_key = st.text_input("Tavily API key", type="password", placeholder="上網查資料才需要")
+    st.markdown("[取得 Tavily API key](https://app.tavily.com/) ｜ [Tavily Search API 文件](https://docs.tavily.com/api-reference/endpoint/search)")
+    with st.expander("Tavily 使用教學", expanded=False):
+        st.markdown(
+            """
+            1. 到 Tavily 註冊並建立 API key。
+            2. 將 key 貼到上方欄位。
+            3. 到「查詢資料」分頁，先點 **分析辯題並產生搜尋關鍵字**。
+            4. 檢查或修改關鍵字後，點 **上網查資料（Tavily）**。
+            5. 最後點 **整理查詢結果**，讓 LLM 將來源整理成正反方可用素材。
+
+            Tavily 負責搜尋網路，LLM 負責整理、分析與生成辯論內容。
+            """
+        )
     if get_default_tavily_key():
         st.caption("已偵測到部署環境或 .env 有 Tavily key。")
 
