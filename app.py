@@ -220,6 +220,31 @@ def get_current_skill_templates() -> dict[str, str]:
     }
 
 
+def render_google_ai_studio_guide() -> None:
+    with st.expander("Google AI Studio 免費使用教學", expanded=False):
+        st.markdown(
+            """
+            1. 前往 [Google AI Studio](https://aistudio.google.com/) 並登入 Google 帳號。
+            2. 點 **Get API key** 或 **API keys**，建立新的 Gemini API key。
+            3. 回到本 app，選擇 **LLM provider: Gemini**。
+            4. 將 API key 貼到側邊欄的 **API key** 欄位。
+            5. 點 **Refresh available models**，從下拉選單選可用模型。
+            6. 建議先試 `gemini-2.5-flash-lite` 或 `gemini-2.5-flash`。
+
+            常見錯誤：
+
+            - `429`: 免費額度或速率限制用完。少勾生成項目、稍後重試或換 key/provider。
+            - `404`: 模型名稱不可用。按 Refresh available models 重新抓模型。
+            - `503`: 模型太忙。系統會自動重試，仍失敗時請稍後再試或換輕量模型。
+
+            官方連結：
+            [Gemini API Quickstart](https://ai.google.dev/gemini-api/docs/quickstart) |
+            [Models](https://ai.google.dev/gemini-api/docs/models/gemini) |
+            [Rate Limits](https://ai.google.dev/gemini-api/docs/quota)
+            """
+        )
+
+
 def show_actionable_error(error: Exception, context: str) -> None:
     title, suggestion = explain_error(error)
     with st.error(f"{context}: {title}"):
@@ -233,20 +258,11 @@ initialize_state()
 st.title("Debate Assistant")
 st.caption("快速產生辯題分析、攻防素材、質詢題、結辯稿，並匯出 Word 文件。")
 
-st.info("第一次使用 Gemini / Google AI Studio？請先看免費使用教學。")
-st.page_link(
-    "pages/1_Free_Google_AI_Studio_Guide.py",
-    label="Open Google AI Studio Free Guide",
-    icon="📘",
-)
+st.info("第一次使用 Gemini / Google AI Studio？展開下方免費使用教學。")
+render_google_ai_studio_guide()
 
 with st.sidebar:
-    st.page_link(
-        "pages/1_Free_Google_AI_Studio_Guide.py",
-        label="Google AI Studio Free Guide",
-        icon="📘",
-    )
-    st.divider()
+    st.caption("Google AI Studio 教學在主畫面上方。")
 
     st.header("Settings")
     side = st.radio("Side option", ["正方", "反方", "雙方"], index=2)
