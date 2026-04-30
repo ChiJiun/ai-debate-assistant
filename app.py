@@ -38,7 +38,12 @@ st.markdown(
 
 MODEL_OPTIONS = {
     "OpenAI": ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o", "o4-mini", "o3"],
-    "Gemini": ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
+    "Gemini": [
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-2.0-flash",
+    ],
     "Claude": ["claude-3-5-haiku-latest", "claude-3-5-sonnet-latest", "claude-3-7-sonnet-latest"],
     "Grok": ["grok-4.20-reasoning", "grok-4.20", "grok-4", "grok-code-fast-1"],
     "DeepSeek": ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner"],
@@ -92,6 +97,7 @@ def initialize_state() -> None:
 def show_actionable_error(error: Exception, context: str) -> None:
     title, explanation, suggestion = explain_error(error)
     with st.error(f"{context}：{title}"):
+        st.markdown(f"**這是什麼錯誤：** {title}")
         st.markdown(f"**錯誤說明：** {explanation}")
         st.markdown(f"**建議處理方式：** {suggestion}")
 
@@ -106,6 +112,7 @@ def render_google_ai_studio_guide() -> None:
             4. 將 API key 貼到側邊欄的 **API key** 欄位。
             5. 點 **Refresh available models**，從下拉選單選可用模型。
             6. 建議先試 `gemini-2.5-flash-lite`。
+            7. Gemini 2 系列模型 ID 是 `gemini-2.0-...`，不是 `gemini-2-...`。
 
             常見錯誤：`429` 是額度限制、`404` 是模型不可用、`503` 是模型暫時太忙。
             """

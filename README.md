@@ -84,6 +84,17 @@ Gemini / Google AI Studio
 gemini-2.5-flash-lite
 ```
 
+適合本 app 的 Google AI Studio / Gemini API 免費文字模型選項：
+
+```text
+gemini-2.5-flash-lite
+gemini-2.5-flash
+gemini-2.0-flash-lite
+gemini-2.0-flash
+```
+
+Gemini 2 系列的模型 ID 使用 `2.0`，例如 `gemini-2.0-flash`，不是 `gemini-2-flash`。
+
 Ollama 是本機模型，不需要 API key。其他線上 provider 通常需要使用者自行提供 API key。
 
 ## 上網查資料
