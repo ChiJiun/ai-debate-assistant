@@ -9,7 +9,13 @@ from skills.cross_examination import generate_cross_examination
 from skills.defense import generate_defense_answers
 from skills.motion_analysis import generate_motion_analysis
 from utils.docx_exporter import build_docx
-from utils.openai_client import DEFAULT_MODELS, LLMConfig, OpenAIConfigError, get_default_api_key
+from utils.openai_client import (
+    DEFAULT_BASE_URLS,
+    DEFAULT_MODELS,
+    LLMConfig,
+    OpenAIConfigError,
+    get_default_api_key,
+)
 from utils.skill_templates import DEFAULT_SKILL_TEMPLATES, templates_from_json, templates_to_json
 
 
@@ -26,16 +32,76 @@ SECTION_LABELS = {
 }
 
 MODEL_OPTIONS = {
-    "OpenAI": ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
-    "Gemini": ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
-    "Claude": ["claude-3-5-haiku-latest", "claude-3-5-sonnet-latest", "claude-3-opus-latest"],
+    "OpenAI": [
+        "gpt-4.1-mini",
+        "gpt-4.1",
+        "gpt-4o-mini",
+        "gpt-4o",
+        "o4-mini",
+        "o3",
+    ],
+    "Gemini": [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+    ],
+    "Claude": [
+        "claude-3-5-haiku-latest",
+        "claude-3-5-sonnet-latest",
+        "claude-3-7-sonnet-latest",
+        "claude-3-opus-latest",
+    ],
+    "Grok": [
+        "grok-4.20-reasoning",
+        "grok-4.20",
+        "grok-4",
+        "grok-code-fast-1",
+    ],
+    "DeepSeek": [
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+        "deepseek-chat",
+        "deepseek-reasoner",
+    ],
+    "Qwen": [
+        "qwen-plus",
+        "qwen3-max",
+        "qwen3.5-flash",
+        "qwen-turbo",
+        "qwen-max",
+    ],
     "OpenRouter": [
         "meta-llama/llama-3.1-8b-instruct:free",
         "google/gemma-2-9b-it:free",
         "mistralai/mistral-7b-instruct:free",
         "deepseek/deepseek-chat",
+        "qwen/qwen3-coder:free",
+        "x-ai/grok-4",
     ],
     "Ollama": ["llama3.1", "llama3.2", "mistral", "qwen2.5", "gemma2"],
+}
+
+PROVIDER_HELP = {
+    "OpenAI": "OpenAI official API.",
+    "Gemini": "Google Gemini API.",
+    "Claude": "Anthropic Claude API.",
+    "Grok": "xAI Grok API.",
+    "DeepSeek": "DeepSeek official OpenAI-compatible API.",
+    "Qwen": "Alibaba Cloud DashScope / Model Studio OpenAI-compatible API.",
+    "OpenRouter": "Aggregator for many hosted models, including free-tagged open models.",
+    "Ollama": "Local open-source models running on your computer. No API key is required.",
+}
+
+PROVIDER_LABELS = {
+    "OpenAI": "OpenAI",
+    "Gemini": "Gemini",
+    "Claude": "Claude",
+    "Grok": "Grok",
+    "DeepSeek": "DeepSeek",
+    "Qwen": "Qwen",
+    "OpenRouter": "OpenRouter",
+    "Ollama": "Ollama (no API key)",
 }
 
 
@@ -134,7 +200,13 @@ with st.sidebar:
     research_mode = st.selectbox("Research mode", ["快速生成，不查資料", "之後保留：查資料模式"])
 
     st.header("LLM")
-    provider = st.selectbox("Provider", ["OpenAI", "Gemini", "Claude", "OpenRouter", "Ollama"])
+    provider = st.selectbox(
+        "LLM provider",
+        ["OpenAI", "Gemini", "Claude", "Grok", "DeepSeek", "Qwen", "OpenRouter", "Ollama"],
+        format_func=lambda value: PROVIDER_LABELS[value],
+        help="先選 LLM 供應商，再選該供應商可用的模型。",
+    )
+    st.caption(PROVIDER_HELP[provider])
     model_choices = MODEL_OPTIONS[provider] + ["Custom model"]
     selected_model = st.selectbox("Model", model_choices)
     custom_model = ""
@@ -154,12 +226,11 @@ with st.sidebar:
         if default_key:
             st.caption("A default key is available from `.env`; this field can override it.")
     else:
-        st.caption("Ollama uses a local server and does not require an API key.")
+        st.caption("No API key required. Make sure Ollama is running locally before generating.")
 
     base_url = ""
-    if provider in {"OpenRouter", "Ollama"}:
-        default_base_url = "https://openrouter.ai/api/v1" if provider == "OpenRouter" else "http://localhost:11434"
-        base_url = st.text_input("Base URL", value=default_base_url)
+    if provider in DEFAULT_BASE_URLS:
+        base_url = st.text_input("Base URL", value=DEFAULT_BASE_URLS[provider])
 
     st.header("Skills")
     uploaded_skill_file = st.file_uploader("Import skill JSON", type=["json"])

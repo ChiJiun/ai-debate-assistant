@@ -19,6 +19,9 @@ PROVIDER_ENV_KEYS = {
     "OpenAI": "OPENAI_API_KEY",
     "Gemini": "GEMINI_API_KEY",
     "Claude": "ANTHROPIC_API_KEY",
+    "Grok": "XAI_API_KEY",
+    "DeepSeek": "DEEPSEEK_API_KEY",
+    "Qwen": "DASHSCOPE_API_KEY",
     "OpenRouter": "OPENROUTER_API_KEY",
 }
 
@@ -27,8 +30,20 @@ DEFAULT_MODELS = {
     "OpenAI": "gpt-4.1-mini",
     "Gemini": "gemini-2.0-flash",
     "Claude": "claude-3-5-haiku-latest",
+    "Grok": "grok-4.20-reasoning",
+    "DeepSeek": "deepseek-v4-flash",
+    "Qwen": "qwen-plus",
     "OpenRouter": "meta-llama/llama-3.1-8b-instruct:free",
     "Ollama": "llama3.1",
+}
+
+
+DEFAULT_BASE_URLS = {
+    "Grok": "https://api.x.ai/v1",
+    "DeepSeek": "https://api.deepseek.com",
+    "Qwen": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    "OpenRouter": "https://openrouter.ai/api/v1",
+    "Ollama": "http://localhost:11434",
 }
 
 
@@ -70,16 +85,33 @@ def _generate_openai(config: LLMConfig, prompt: str, temperature: float) -> str:
 
 
 def _generate_openrouter(config: LLMConfig, prompt: str, temperature: float) -> str:
+    return _generate_openai_chat_compatible(config, prompt, temperature)
+
+
+def _generate_openai_chat_compatible(config: LLMConfig, prompt: str, temperature: float) -> str:
     client = OpenAI(
         api_key=_require_api_key(config),
-        base_url=config.base_url or "https://openrouter.ai/api/v1",
+        base_url=config.base_url or DEFAULT_BASE_URLS[config.provider],
     )
     response = client.chat.completions.create(
-        model=config.model or DEFAULT_MODELS["OpenRouter"],
+        model=config.model or DEFAULT_MODELS[config.provider],
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
     )
     return response.choices[0].message.content.strip()
+
+
+def _generate_grok(config: LLMConfig, prompt: str, temperature: float) -> str:
+    client = OpenAI(
+        api_key=_require_api_key(config),
+        base_url=config.base_url or DEFAULT_BASE_URLS["Grok"],
+    )
+    response = client.responses.create(
+        model=config.model or DEFAULT_MODELS["Grok"],
+        input=prompt,
+        temperature=temperature,
+    )
+    return response.output_text.strip()
 
 
 def _generate_gemini(config: LLMConfig, prompt: str, temperature: float) -> str:
@@ -109,7 +141,7 @@ def _generate_claude(config: LLMConfig, prompt: str, temperature: float) -> str:
 
 
 def _generate_ollama(config: LLMConfig, prompt: str, temperature: float) -> str:
-    endpoint = (config.base_url or "http://localhost:11434").rstrip("/")
+    endpoint = (config.base_url or DEFAULT_BASE_URLS["Ollama"]).rstrip("/")
     response = requests.post(
         f"{endpoint}/api/generate",
         json={
@@ -132,6 +164,10 @@ def generate_text(prompt: str, *, llm_config: LLMConfig, temperature: float = 0.
         return _generate_gemini(llm_config, prompt, temperature)
     if provider == "Claude":
         return _generate_claude(llm_config, prompt, temperature)
+    if provider == "Grok":
+        return _generate_grok(llm_config, prompt, temperature)
+    if provider in {"DeepSeek", "Qwen"}:
+        return _generate_openai_chat_compatible(llm_config, prompt, temperature)
     if provider == "OpenRouter":
         return _generate_openrouter(llm_config, prompt, temperature)
     if provider == "Ollama":

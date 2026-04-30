@@ -26,10 +26,15 @@ A simple Streamlit web app that helps users prepare debate materials quickly and
 - OpenAI
 - Gemini
 - Claude
+- Grok
+- DeepSeek
+- Qwen
 - OpenRouter, including open-source and free-tagged hosted models
 - Ollama for local open-source models
 
-OpenRouter and Ollama also expose a Base URL field in the sidebar. For Ollama, start the local server first and use a local model name such as `llama3.1`, `mistral`, or `qwen2.5`.
+Grok, DeepSeek, Qwen, OpenRouter, and Ollama expose a Base URL field in the sidebar. For Ollama, start the local server first and use a local model name such as `llama3.1`, `mistral`, or `qwen2.5`.
+
+Ollama is marked as `no API key` in the app because it runs locally. OpenRouter models tagged as free may have zero model cost, but they still usually require an OpenRouter API key.
 
 ## Setup
 
@@ -46,6 +51,9 @@ Edit `.env` if you want default keys and model settings:
 OPENAI_API_KEY=your_openai_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
+XAI_API_KEY=your_xai_grok_api_key_here
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+DASHSCOPE_API_KEY=your_qwen_dashscope_api_key_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 DEFAULT_PROVIDER=OpenAI
 DEFAULT_MODEL=gpt-4.1-mini
