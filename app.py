@@ -15,6 +15,7 @@ from utils.openai_client import (
     LLMConfig,
     OpenAIConfigError,
     get_default_api_key,
+    list_available_models,
 )
 from utils.skill_templates import DEFAULT_SKILL_TEMPLATES, templates_from_json, templates_to_json
 
@@ -41,10 +42,11 @@ MODEL_OPTIONS = {
         "o3",
     ],
     "Gemini": [
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
         "gemini-2.0-flash",
         "gemini-2.0-flash-lite",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
     ],
     "Claude": [
         "claude-3-5-haiku-latest",
@@ -108,6 +110,7 @@ PROVIDER_LABELS = {
 def initialize_state() -> None:
     st.session_state.setdefault("generated_sections", {})
     st.session_state.setdefault("last_settings", {})
+    st.session_state.setdefault("provider_model_options", {})
     for key, value in DEFAULT_SKILL_TEMPLATES.items():
         st.session_state.setdefault(f"skill_template_{key}", value)
 
@@ -207,12 +210,6 @@ with st.sidebar:
         help="先選 LLM 供應商，再選該供應商可用的模型。",
     )
     st.caption(PROVIDER_HELP[provider])
-    model_choices = MODEL_OPTIONS[provider] + ["Custom model"]
-    selected_model = st.selectbox("Model", model_choices)
-    custom_model = ""
-    if selected_model == "Custom model":
-        custom_model = st.text_input("Custom model name", value=DEFAULT_MODELS.get(provider, ""))
-    model = custom_model.strip() or selected_model
 
     default_key = get_default_api_key(provider)
     api_key = ""
@@ -231,6 +228,33 @@ with st.sidebar:
     base_url = ""
     if provider in DEFAULT_BASE_URLS:
         base_url = st.text_input("Base URL", value=DEFAULT_BASE_URLS[provider])
+
+    refresh_models = st.button("Refresh available models", use_container_width=True)
+    if refresh_models:
+        try:
+            fetched_models = list_available_models(
+                LLMConfig(
+                    provider=provider,
+                    model=DEFAULT_MODELS.get(provider, ""),
+                    api_key=api_key,
+                    base_url=base_url,
+                )
+            )
+            if fetched_models:
+                st.session_state.provider_model_options[provider] = fetched_models
+                st.success(f"Loaded {len(fetched_models)} models for {provider}.")
+            else:
+                st.warning("No compatible text-generation models were returned.")
+        except Exception as exc:
+            st.error(f"Could not refresh models: {exc}")
+
+    provider_models = st.session_state.provider_model_options.get(provider, MODEL_OPTIONS[provider])
+    model_choices = provider_models + ["Custom model"]
+    selected_model = st.selectbox("Model", model_choices)
+    custom_model = ""
+    if selected_model == "Custom model":
+        custom_model = st.text_input("Custom model name", value=DEFAULT_MODELS.get(provider, ""))
+    model = custom_model.strip() or selected_model
 
     st.header("Skills")
     uploaded_skill_file = st.file_uploader("Import skill JSON", type=["json"])

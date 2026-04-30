@@ -36,6 +36,8 @@ Grok, DeepSeek, Qwen, OpenRouter, and Ollama expose a Base URL field in the side
 
 Ollama is marked as `no API key` in the app because it runs locally. OpenRouter models tagged as free may have zero model cost, but they still usually require an OpenRouter API key.
 
+Use `Refresh available models` in the sidebar after entering an API key to load the provider's current model list into the model dropdown. For Ollama, start the local Ollama server first, then refresh models.
+
 ## Setup
 
 ```bash
