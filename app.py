@@ -47,12 +47,12 @@ st.markdown(
 
 
 SECTION_LABELS = {
-    "motion_analysis": "Motion Analysis",
-    "arguments": "Affirmative and Negative Materials",
-    "constructive": "Constructive Speeches",
-    "cross_examination": "Cross-Examination",
-    "defense": "Defense Answers",
-    "closing": "Closing Speeches",
+    "motion_analysis": "辯題分析",
+    "arguments": "正反方論點素材",
+    "constructive": "立論稿",
+    "cross_examination": "交叉質詢",
+    "defense": "防守回答",
+    "closing": "結辯稿",
 }
 
 SECTION_ORDER = list(SECTION_LABELS)
@@ -382,7 +382,7 @@ with st.sidebar:
         use_container_width=True,
     )
 
-st.subheader("Materials to generate")
+st.subheader("選擇要生成的內容")
 st.caption("只勾需要的段落，可以省 API 額度並降低等待時間。")
 selected_sections = []
 section_columns = st.columns(3)
