@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -49,6 +50,10 @@ DEFAULT_BASE_URLS = {
 
 class OpenAIConfigError(RuntimeError):
     """Raised when LLM provider configuration is missing."""
+
+
+class LLMRetryExhaustedError(RuntimeError):
+    """Raised after retryable provider errors keep failing."""
 
 
 @dataclass(frozen=True)
@@ -240,7 +245,12 @@ def _generate_ollama(config: LLMConfig, prompt: str, temperature: float) -> str:
     return response.json().get("response", "").strip()
 
 
-def generate_text(prompt: str, *, llm_config: LLMConfig, temperature: float = 0.4) -> str:
+def _is_retryable_unavailable(error: Exception) -> bool:
+    message = str(error).lower()
+    return "503" in message or "unavailable" in message or "high demand" in message
+
+
+def _generate_text_once(prompt: str, *, llm_config: LLMConfig, temperature: float) -> str:
     provider = llm_config.provider
     if provider == "OpenAI":
         return _generate_openai(llm_config, prompt, temperature)
@@ -257,3 +267,23 @@ def generate_text(prompt: str, *, llm_config: LLMConfig, temperature: float = 0.
     if provider == "Ollama":
         return _generate_ollama(llm_config, prompt, temperature)
     raise OpenAIConfigError(f"Unsupported LLM provider: {provider}")
+
+
+def generate_text(
+    prompt: str,
+    *,
+    llm_config: LLMConfig,
+    temperature: float = 0.4,
+    max_retries: int = 2,
+) -> str:
+    last_error: Exception | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            return _generate_text_once(prompt, llm_config=llm_config, temperature=temperature)
+        except Exception as exc:
+            last_error = exc
+            if not _is_retryable_unavailable(exc) or attempt >= max_retries:
+                raise
+            time.sleep(2 * (attempt + 1))
+
+    raise LLMRetryExhaustedError(f"Generation failed after retries: {last_error}")

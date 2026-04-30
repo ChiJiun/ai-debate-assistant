@@ -20,7 +20,7 @@ def explain_error(error: Exception) -> tuple[str, str]:
     if "unavailable" in lower_message or "503" in message or "high demand" in lower_message:
         return (
             "模型暫時忙碌",
-            "供應商目前流量太高或模型暫時不可用。請稍後重試，或換成 flash-lite / 較小模型，必要時改用其他 provider。",
+            "供應商目前流量太高或模型暫時不可用。系統會自動重試幾次；如果仍失敗，請稍後再按 Generate，或換成 flash-lite / 較小模型，必要時改用其他 provider。",
         )
 
     if "unauthorized" in lower_message or "401" in message or "invalid api key" in lower_message:
