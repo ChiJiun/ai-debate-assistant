@@ -6,7 +6,7 @@ from skills.closing import analyze_closing, generate_closing
 from skills.constructive import analyze_constructive, generate_constructive
 from skills.defense import analyze_defense, generate_defense
 from skills.questioning import generate_questioning, simulate_question_answer
-from skills.research import summarize_research
+from skills.research import plan_search_queries, summarize_research
 from utils.docx_exporter import build_docx
 from utils.error_messages import explain_error
 from utils.openai_client import (
@@ -18,7 +18,7 @@ from utils.openai_client import (
     get_default_api_key,
     list_available_models,
 )
-from utils.research_client import format_search_results, get_default_tavily_key, search_tavily
+from utils.research_client import extract_search_queries, format_search_results, get_default_tavily_key, search_tavily
 
 
 st.set_page_config(page_title="辯論助理", page_icon="🎙️", layout="wide")
@@ -69,6 +69,8 @@ def initialize_state() -> None:
         "motion": "政府應/不應平衡其預算",
         "side": "正方",
         "manual_material": "",
+        "search_plan": "",
+        "search_queries": "",
         "search_material": "",
         "research_summary": "",
         "sources_text": "",
@@ -211,24 +213,83 @@ with tab_research:
         value=st.session_state.manual_material,
         height=180,
     )
-    search_query = st.text_input("搜尋關鍵字", value=st.session_state.motion)
-    max_results = st.slider("搜尋結果數量", min_value=3, max_value=10, value=5)
+    st.caption("建議流程：先讓 LLM 分析辯題產生關鍵字，再用 Tavily 搜尋，最後整理搜尋結果。")
+
+    if st.button("1. 分析辯題並產生搜尋關鍵字", use_container_width=True):
+        try:
+            st.session_state.search_plan = plan_search_queries(
+                st.session_state.motion,
+                st.session_state.side,
+                st.session_state.manual_material,
+                llm_config,
+            )
+            query_lines = [
+                line.strip().removeprefix("-").strip()
+                for line in st.session_state.search_plan.splitlines()
+                if line.strip().startswith("-")
+            ]
+            st.session_state.search_queries = "\n".join(query_lines) or st.session_state.motion
+            st.success("已產生搜尋策略與關鍵字。")
+        except Exception as exc:
+            show_actionable_error(exc, "產生搜尋關鍵字失敗")
+
+    if st.session_state.search_plan:
+        with st.expander("LLM 搜尋策略", expanded=False):
+            st.markdown(st.session_state.search_plan)
+
+    st.session_state.search_queries = st.text_area(
+        "搜尋關鍵字（每行一組，可自行修改）",
+        value=st.session_state.search_queries or st.session_state.motion,
+        height=140,
+    )
+    max_results = st.slider("每組關鍵字搜尋結果數量", min_value=1, max_value=20, value=5)
+    time_range_label = st.selectbox(
+        "資料時間範圍",
+        ["不限", "過去一天", "過去一週", "過去一個月", "過去一年"],
+        index=0,
+    )
+    time_range_map = {
+        "不限": "",
+        "過去一天": "day",
+        "過去一週": "week",
+        "過去一個月": "month",
+        "過去一年": "year",
+    }
+    search_depth_label = st.selectbox(
+        "搜尋深度",
+        ["快速", "標準", "進階"],
+        index=1,
+        help="進階搜尋通常更完整，但可能較慢且消耗較多 Tavily 額度。",
+    )
+    search_depth_map = {"快速": "fast", "標準": "basic", "進階": "advanced"}
 
     col_search, col_summarize = st.columns(2)
     with col_search:
-        if st.button("上網查資料（Tavily）", use_container_width=True):
+        if st.button("2. 上網查資料（Tavily）", use_container_width=True):
             try:
-                results = search_tavily(search_query, tavily_key, max_results=max_results)
-                st.session_state.search_material = format_search_results(results)
+                queries = extract_search_queries(st.session_state.search_queries)
+                all_results = []
+                material_parts = []
+                for query in queries:
+                    results = search_tavily(
+                        query,
+                        tavily_key,
+                        max_results=max_results,
+                        time_range=time_range_map[time_range_label],
+                        search_depth=search_depth_map[search_depth_label],
+                    )
+                    all_results.extend(results)
+                    material_parts.append(f"## 查詢：{query}\n{format_search_results(results)}")
+                st.session_state.search_material = "\n\n".join(material_parts)
                 st.session_state.sources_text = "\n".join(
-                    f"- [{result.title}]({result.url})" for result in results if result.url
+                    f"- [{result.title}]({result.url})" for result in all_results if result.url
                 )
-                st.success("查詢完成。")
+                st.success(f"查詢完成，共搜尋 {len(queries)} 組關鍵字。")
             except Exception as exc:
                 show_actionable_error(exc, "查資料失敗")
 
     with col_summarize:
-        if st.button("整理目前資料", use_container_width=True):
+        if st.button("3. 整理查詢結果", use_container_width=True):
             try:
                 st.session_state.research_summary = summarize_research(
                     st.session_state.motion,

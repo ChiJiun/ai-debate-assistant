@@ -21,10 +21,26 @@ def get_default_tavily_key() -> str:
     return os.getenv("TAVILY_API_KEY", "")
 
 
-def search_tavily(query: str, api_key: str = "", max_results: int = 5) -> list[SearchResult]:
+def search_tavily(
+    query: str,
+    api_key: str = "",
+    max_results: int = 5,
+    time_range: str = "",
+    search_depth: str = "basic",
+) -> list[SearchResult]:
     tavily_key = api_key.strip() or get_default_tavily_key()
     if not tavily_key:
         raise RuntimeError("Missing Tavily API key. 請在側邊欄填入 Tavily API key，或在 secrets/.env 設定 TAVILY_API_KEY。")
+
+    payload = {
+        "query": query,
+        "search_depth": search_depth,
+        "max_results": max_results,
+        "include_answer": False,
+        "include_raw_content": False,
+    }
+    if time_range:
+        payload["time_range"] = time_range
 
     response = requests.post(
         "https://api.tavily.com/search",
@@ -32,13 +48,7 @@ def search_tavily(query: str, api_key: str = "", max_results: int = 5) -> list[S
             "Authorization": f"Bearer {tavily_key}",
             "Content-Type": "application/json",
         },
-        json={
-            "query": query,
-            "search_depth": "basic",
-            "max_results": max_results,
-            "include_answer": False,
-            "include_raw_content": False,
-        },
+        json=payload,
         timeout=45,
     )
     response.raise_for_status()
@@ -63,3 +73,16 @@ def format_search_results(results: list[SearchResult]) -> str:
         lines.append(f"摘要: {result.content}")
         lines.append("")
     return "\n".join(lines).strip()
+
+
+def extract_search_queries(raw_text: str) -> list[str]:
+    queries: list[str] = []
+    for raw_line in raw_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        line = line.removeprefix("-").removeprefix("*").strip()
+        if line.startswith("#") or len(line) < 3:
+            continue
+        queries.append(line)
+    return queries
