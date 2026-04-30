@@ -24,24 +24,38 @@ SKILLS: dict[str, SkillInfo] = {
     "research_queries": SkillInfo(
         key="research_queries",
         name="查資料：搜尋關鍵字",
-        purpose="先判斷辯題需要哪些可查證資訊，再產生給 Tavily 使用的乾淨搜尋關鍵字。",
+        purpose="先判斷辯題需要哪些可查證資訊，再產生給 Tavily 使用的搜尋關鍵字與每組取回筆數。",
         prompt=f"""
 角色：
 你是辯論研究助理，擅長把抽象辯題拆成可查證的搜尋問題。
 
 任務：
-產生適合交給 Tavily 搜尋 API 的搜尋關鍵字。
+產生適合交給 Tavily 搜尋 API 的搜尋計畫。
 
 背景：
+辯題：
+{{motion}}
+
+使用者立場：
+{{side}}
+
 使用者資料：
 {{user_material}}
 
 格式：
-- 請自行判斷需要搜尋幾組關鍵字，通常 3 到 7 組即可。
-- 每行只輸出一組搜尋字串。
-- 不要輸出標題、編號、Markdown、分析或解釋。
+- 只輸出 JSON array，不要輸出標題、Markdown、分析或解釋。
+- 每個物件只包含：
+  - "query": 一組搜尋字串
+  - "max_results": 這組查詢要取回幾筆結果，整數 1 到 4
+- 請自行判斷需要搜尋幾組關鍵字，通常 3 到 5 組即可。
 - 關鍵字要具體、可查證，並同時涵蓋正反方可能需要的事實問題。
 - 可混合中文與英文。
+
+範例：
+[
+  {{{{"query": "balanced budget rule economic effects evidence", "max_results": 4}}}},
+  {{{{"query": "政府 平衡預算 財政紀律 社會福利 影響", "max_results": 3}}}}
+]
 
 {COMMON_RULES}
 """.strip(),
@@ -164,8 +178,8 @@ SKILLS: dict[str, SkillInfo] = {
     ),
     "questioning_simulate": SkillInfo(
         key="questioning_simulate",
-        name="質詢：模擬對方回答",
-        purpose="模擬對方如何回答使用者的質詢問題，並提供下一句追問。",
+        name="質詢：多輪模擬",
+        purpose="根據目前質詢紀錄，模擬對方如何回答使用者的質詢問題，並提供下一句追問。",
         prompt=f"""
 角色：
 你是辯論陪練，會先站在對方立場給出合理短答，再幫使用者追問。
@@ -180,13 +194,17 @@ SKILLS: dict[str, SkillInfo] = {
 對方可用材料：
 {{opponent_material}}
 
+目前質詢紀錄：
+{{dialogue_history}}
+
 格式：
 - 我方問：
 - 對方可能答：
 - 我方追問：
 
 要求：
-- 只輸出簡短一來一回。
+- 如果已有質詢紀錄，請延續前文，不要重複前面已問過的問題。
+- 只輸出本輪簡短一來一回。
 - 不要附額外分析。
 - 對方回答要合理，不要刻意變笨。
 
@@ -211,44 +229,57 @@ SKILLS: dict[str, SkillInfo] = {
 可用資料：
 {{source_material}}
 
+目前答辯紀錄：
+{{dialogue_history}}
+
 格式：
 - 對方問：
 - 我方答：用 2 到 4 句回答，控制在 15 到 30 秒
 - 對方可能追問：
-- 我方再答：用 1 到 3 句回答
 - 轉回主線：
 
 要求：
 - 不要寫成完整申論稿。
 - 不要提供過多分析。
 - 回答要先處理問題，再轉回己方核心標準。
+- 如果已有答辯紀錄，請延續前文，不要重複前面已說過的回答。
 
 {COMMON_RULES}
 """.strip(),
     ),
-    "defense_analyze": SkillInfo(
-        key="defense_analyze",
-        name="答辯：分析回答",
-        purpose="簡短指出答辯回答的問題，並提供一版可直接使用的改寫。",
+    "defense_followup": SkillInfo(
+        key="defense_followup",
+        name="答辯：多輪追問",
+        purpose="根據目前答辯紀錄與使用者回答，模擬對方下一輪追問，讓答辯可以多輪練習。",
         prompt=f"""
 角色：
-你是辯論答辯教練，擅長讓回答更直接、更不容易被追打。
+你是對方質詢者兼辯論陪練，擅長根據使用者回答追問尚未處理清楚的漏洞。
 
 任務：
-分析使用者的答辯表現，並給一版更好的回答。
+使用者是「{{side}}」。請根據目前答辯紀錄與使用者剛剛的回答，產生對方下一輪追問。
 
 背景：
-被質詢問題：
+原始被質詢問題：
 {{question}}
 
-使用者回答：
+使用者本輪回答：
 {{answer}}
 
+可用資料：
+{{source_material}}
+
+目前答辯紀錄：
+{{dialogue_history}}
+
 格式：
-## 問題
-- 最多 3 點
-## 建議回答
-- 給一版 15 到 30 秒的改寫回答
+- 對方追問：
+- 追問角度：
+
+要求：
+- 對方追問只用一句話。
+- 追問角度只用一句短句，說明這題打哪個漏洞。
+- 不要提供我方回答，不要進行長篇分析。
+- 要延續上文，不要重複已經問過的問題。
 
 {COMMON_RULES}
 """.strip(),

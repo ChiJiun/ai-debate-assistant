@@ -16,7 +16,7 @@ def explain_error(error: Exception) -> tuple[str, str, str]:
         return (
             "配額或速率限制錯誤",
             "這通常代表 API key 的免費額度用完、每分鐘請求太多，或這個模型目前沒有可用 quota。Gemini 免費層特別容易遇到這個問題。",
-            "請稍後重試、換較輕量模型、改用其他 provider，或使用另一組有額度的 API key。查資料時也可以降低每組搜尋結果數量。",
+            "請稍後重試、換較輕量模型、改用其他 provider，或使用另一組有額度的 API key。查資料時也可以改用快速搜尋或縮短資料時間範圍。",
         )
 
     if "not_found" in lower_message or "404" in message or "model" in lower_message and "not found" in lower_message:
@@ -51,7 +51,7 @@ def explain_error(error: Exception) -> tuple[str, str, str]:
         return (
             "連線逾時",
             "模型或搜尋服務回應太慢，也可能是網路不穩。",
-            "請重試、改用較快模型，或降低搜尋結果數量。若使用 Ollama，請確認本機模型已載入完成。",
+            "請重試、改用較快模型，或把搜尋深度改成快速。若使用 Ollama，請確認本機模型已載入完成。",
         )
 
     if "connection" in lower_message or "connect" in lower_message:

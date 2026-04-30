@@ -4,7 +4,7 @@ import streamlit as st
 
 from skills.closing import analyze_closing, generate_closing
 from skills.constructive import analyze_constructive, generate_constructive
-from skills.defense import analyze_defense, generate_defense
+from skills.defense import generate_defense, generate_defense_followup
 from skills.questioning import generate_questioning, simulate_question_answer
 from skills.research import run_research_workflow
 from utils.docx_exporter import build_docx
@@ -84,8 +84,9 @@ def initialize_state() -> None:
         "opponent_constructive": "",
         "questioning": "",
         "question_simulation": "",
+        "question_dialogue": "",
         "defense": "",
-        "defense_analysis": "",
+        "defense_dialogue": "",
         "closing": "",
         "closing_analysis": "",
         "provider_model_options": {},
@@ -141,10 +142,23 @@ def combined_all_materials() -> str:
         "對方申論": st.session_state.get("opponent_constructive", ""),
         "質詢設計": st.session_state.get("questioning", ""),
         "質詢模擬": st.session_state.get("question_simulation", ""),
+        "質詢多輪紀錄": st.session_state.get("question_dialogue", ""),
         "答辯內容": st.session_state.get("defense", ""),
-        "答辯分析": st.session_state.get("defense_analysis", ""),
+        "答辯多輪紀錄": st.session_state.get("defense_dialogue", ""),
     }
     return "\n\n".join(f"## {label}\n{value}" for label, value in labeled_parts.items() if value.strip())
+
+
+def append_dialogue(existing: str, heading: str, content: str) -> str:
+    clean_content = content.strip()
+    if not clean_content:
+        return existing
+    block = f"## {heading}\n{clean_content}"
+    return "\n\n".join(part for part in [existing.strip(), block] if part)
+
+
+def display_prompt_template(prompt: str) -> str:
+    return prompt.replace("{{", "{").replace("}}", "}")
 
 
 def render_sources() -> None:
@@ -244,9 +258,9 @@ with st.sidebar:
             """
             1. 到 Tavily 註冊並建立 API key。
             2. 將 key 貼到上方欄位。
-            3. 到「查詢資料」分頁調整搜尋數量、時間範圍與搜尋深度。
+            3. 到「查詢資料」分頁調整資料時間範圍與搜尋深度。
             4. 點 **自動查資料並整理**。
-            5. 系統會讓 LLM 產生乾淨關鍵字，交給 Tavily 搜尋，再由 LLM 整理正反方素材。
+            5. 系統會讓 LLM 決定搜尋關鍵字與每組取回筆數，交給 Tavily 搜尋，再由 LLM 整理正反方素材。
 
             Tavily 負責搜尋網路，LLM 負責整理、分析與生成辯論內容。
             """
@@ -260,7 +274,7 @@ with st.sidebar:
         with st.expander(skill.name, expanded=False):
             st.markdown(f"**主要功用：** {skill.purpose}")
             st.markdown("**Prompt：**")
-            st.code(skill.prompt, language="text")
+            st.code(display_prompt_template(skill.prompt), language="text")
 
 tab_research, tab_constructive, tab_questioning, tab_defense, tab_closing, tab_export = st.tabs(
     ["查詢資料", "申論", "質詢", "答辯", "結辯", "匯出"]
@@ -273,15 +287,7 @@ with tab_research:
         value=st.session_state.manual_material,
         height=180,
     )
-    st.caption("自動流程：LLM 只產生搜尋關鍵字 → Tavily 搜尋 → LLM 整理查詢結果。")
-    max_results = st.number_input(
-        "每組關鍵字搜尋結果數量",
-        min_value=1,
-        max_value=20,
-        value=5,
-        step=1,
-        help="Tavily 每組關鍵字最多取回多少筆結果。",
-    )
+    st.caption("自動流程：LLM 決定搜尋關鍵字與每組取回筆數 → Tavily 搜尋 → LLM 整理查詢結果。")
     time_range_options = ["不限", "過去一天", "過去一週", "過去一個月", "過去一年"]
     time_range_label = st.selectbox("資料時間範圍", time_range_options, index=0)
     time_range_map = {
@@ -309,7 +315,6 @@ with tab_research:
                     st.session_state.manual_material,
                     llm_config,
                     tavily_key,
-                    max_results=int(max_results),
                     time_range=time_range_map[time_range_label],
                     search_depth=search_depth_map[search_depth_label],
                 )
@@ -322,7 +327,7 @@ with tab_research:
             show_actionable_error(exc, "自動查資料失敗")
 
     if st.session_state.search_queries:
-        with st.expander("LLM 提供給 Tavily 的搜尋關鍵字", expanded=False):
+        with st.expander("LLM 提供給 Tavily 的搜尋計畫", expanded=False):
             st.code(st.session_state.search_queries)
     if st.session_state.search_material:
         render_sources()
@@ -392,57 +397,94 @@ with tab_questioning:
             st.markdown(st.session_state.questioning)
 
     with col_simulation:
-        question = st.text_area("輸入你要問對方的質詢問題", height=130)
-        if st.button("模擬對方回答並給追問", use_container_width=True):
+        question = st.text_area("輸入你要問對方的質詢問題 / 下一輪追問", height=130)
+        if st.button("送出本輪質詢", use_container_width=True):
             try:
-                st.session_state.question_simulation = simulate_question_answer(
+                simulation = simulate_question_answer(
                     st.session_state.motion,
                     st.session_state.side,
                     question,
-                    st.session_state.opponent_constructive,
+                    "\n\n".join(
+                        part
+                        for part in [combined_all_materials(), st.session_state.opponent_constructive]
+                        if part.strip()
+                    ),
+                    st.session_state.question_dialogue,
                     llm_config,
+                )
+                round_number = st.session_state.question_dialogue.count("## 第") + 1
+                st.session_state.question_simulation = simulation
+                st.session_state.question_dialogue = append_dialogue(
+                    st.session_state.question_dialogue,
+                    f"第 {round_number} 輪質詢",
+                    simulation,
                 )
                 st.success("質詢模擬完成。")
             except Exception as exc:
                 show_actionable_error(exc, "質詢模擬失敗")
-        if st.session_state.question_simulation:
-            st.markdown(st.session_state.question_simulation)
+        if st.button("清空質詢紀錄", use_container_width=True):
+            st.session_state.question_dialogue = ""
+            st.session_state.question_simulation = ""
+        if st.session_state.question_dialogue:
+            st.markdown("### 質詢多輪紀錄")
+            st.markdown(st.session_state.question_dialogue)
 
 with tab_defense:
     st.subheader("答辯")
     defense_question = st.text_area("輸入你被質詢的問題", height=130)
-    col_defense, col_defense_analysis = st.columns(2)
+    col_defense, col_followup = st.columns(2)
     with col_defense:
-        if st.button("生成答辯內容", use_container_width=True):
+        if st.button("生成本輪答辯", use_container_width=True):
             try:
-                st.session_state.defense = generate_defense(
+                defense = generate_defense(
                     st.session_state.motion,
                     st.session_state.side,
                     defense_question,
-                    combined_research_material(),
+                    combined_all_materials(),
+                    st.session_state.defense_dialogue,
                     llm_config,
+                )
+                round_number = st.session_state.defense_dialogue.count("## 第") + 1
+                st.session_state.defense = defense
+                st.session_state.defense_dialogue = append_dialogue(
+                    st.session_state.defense_dialogue,
+                    f"第 {round_number} 輪答辯",
+                    defense,
                 )
                 st.success("答辯生成完成。")
             except Exception as exc:
                 show_actionable_error(exc, "生成答辯失敗")
-        st.text_area("答辯內容", key="defense", height=260)
+        st.text_area("本輪答辯內容", key="defense", height=260)
 
-    with col_defense_analysis:
-        user_answer = st.text_area("貼上你的答辯回答，讓助理分析", height=200)
-        if st.button("分析答辯回答", use_container_width=True):
+    with col_followup:
+        user_answer = st.text_area("輸入你剛剛實際回答的內容，讓對方繼續追問", height=200)
+        if st.button("產生對方下一輪追問", use_container_width=True):
             try:
-                st.session_state.defense_analysis = analyze_defense(
+                followup = generate_defense_followup(
                     st.session_state.motion,
                     st.session_state.side,
                     defense_question,
                     user_answer or st.session_state.defense,
+                    combined_all_materials(),
+                    st.session_state.defense_dialogue,
                     llm_config,
                 )
-                st.success("答辯分析完成。")
+                round_number = st.session_state.defense_dialogue.count("## 對方第") + 1
+                st.session_state.defense_dialogue = append_dialogue(
+                    st.session_state.defense_dialogue,
+                    f"對方第 {round_number} 次追問",
+                    followup,
+                )
+                st.success("對方追問生成完成。")
             except Exception as exc:
-                show_actionable_error(exc, "分析答辯失敗")
-        if st.session_state.defense_analysis:
-            st.markdown(st.session_state.defense_analysis)
+                show_actionable_error(exc, "產生對方追問失敗")
+        if st.button("清空答辯紀錄", use_container_width=True):
+            st.session_state.defense_dialogue = ""
+            st.session_state.defense = ""
+
+    if st.session_state.defense_dialogue:
+        st.markdown("### 答辯多輪紀錄")
+        st.markdown(st.session_state.defense_dialogue)
 
 with tab_closing:
     st.subheader("結辯")
@@ -490,9 +532,9 @@ with tab_export:
         "申論分析": st.session_state.constructive_analysis,
         "對方申論 / 資料": st.session_state.opponent_constructive,
         "質詢問題": st.session_state.questioning,
-        "質詢模擬": st.session_state.question_simulation,
+        "質詢多輪紀錄": st.session_state.question_dialogue,
         "答辯內容": st.session_state.defense,
-        "答辯分析": st.session_state.defense_analysis,
+        "答辯多輪紀錄": st.session_state.defense_dialogue,
         "結辯稿": st.session_state.closing,
         "結辯分析": st.session_state.closing_analysis,
         "來源": st.session_state.sources_text,

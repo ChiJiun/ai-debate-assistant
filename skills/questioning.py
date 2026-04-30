@@ -28,15 +28,17 @@ def simulate_question_answer(
     user_side: str,
     question: str,
     opponent_material: str,
+    dialogue_history: str,
     llm_config: LLMConfig,
 ) -> str:
     opponent = opponent_side(user_side)
-    context = debate_context(motion, opponent)
+    context = debate_context(motion, user_side)
     task = get_skill_prompt(
         "questioning_simulate",
         opponent=opponent,
         user_side=user_side,
         question=question,
         opponent_material=opponent_material or "無",
+        dialogue_history=dialogue_history or "尚未開始質詢。",
     )
     return generate_text(section_prompt(context, task), llm_config=llm_config)
