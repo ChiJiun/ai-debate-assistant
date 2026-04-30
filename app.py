@@ -24,6 +24,27 @@ from utils.skill_templates import DEFAULT_SKILL_TEMPLATES, templates_from_json, 
 
 st.set_page_config(page_title="Debate Assistant", page_icon="🎙️", layout="wide")
 
+st.markdown(
+    """
+    <style>
+    section[data-testid="stSidebar"] {
+        min-width: 320px;
+    }
+    div[data-testid="stButton"] > button {
+        min-height: 2.8rem;
+    }
+    div[data-testid="stCheckbox"] label {
+        min-height: 2.4rem;
+        align-items: center;
+    }
+    textarea {
+        min-height: 120px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 SECTION_LABELS = {
     "motion_analysis": "Motion Analysis",
@@ -270,16 +291,6 @@ with st.sidebar:
     output_style = st.selectbox("Output style", ["正式辯論", "課堂報告", "簡短口語"])
     research_mode = st.selectbox("Research mode", ["快速生成，不查資料", "之後保留：查資料模式"])
 
-    st.header("Generate")
-    selected_sections = st.multiselect(
-        "Materials to generate",
-        SECTION_ORDER,
-        default=st.session_state.selected_sections,
-        format_func=lambda value: SECTION_LABELS[value],
-        help="只產生需要的段落，可以省 API 額度並降低等待時間。",
-    )
-    st.session_state.selected_sections = selected_sections
-
     st.header("LLM")
     providers = ["OpenAI", "Gemini", "Claude", "Grok", "DeepSeek", "Qwen", "OpenRouter", "Ollama"]
     default_provider_index = providers.index(DEFAULT_PROVIDER) if DEFAULT_PROVIDER in providers else providers.index("Gemini")
@@ -370,6 +381,21 @@ with st.sidebar:
         mime="application/json",
         use_container_width=True,
     )
+
+st.subheader("Materials to generate")
+st.caption("只勾需要的段落，可以省 API 額度並降低等待時間。")
+selected_sections = []
+section_columns = st.columns(3)
+for index, key in enumerate(SECTION_ORDER):
+    with section_columns[index % 3]:
+        checked = st.checkbox(
+            SECTION_LABELS[key],
+            value=key in st.session_state.selected_sections,
+            key=f"select_section_{key}",
+        )
+        if checked:
+            selected_sections.append(key)
+st.session_state.selected_sections = selected_sections
 
 motion = st.text_area(
     "Debate motion",
