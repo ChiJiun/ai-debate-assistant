@@ -15,6 +15,7 @@ A simple Streamlit web app that helps users prepare debate materials quickly and
 - Cross-examination questions
 - Defense answers
 - Closing speeches
+- Select only the materials you want to generate
 - DOCX export
 - User-selectable LLM provider and model
 - User-entered API key in the app sidebar
@@ -58,8 +59,8 @@ XAI_API_KEY=your_xai_grok_api_key_here
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
 DASHSCOPE_API_KEY=your_qwen_dashscope_api_key_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-DEFAULT_PROVIDER=OpenAI
-DEFAULT_MODEL=gpt-4.1-mini
+DEFAULT_PROVIDER=Gemini
+DEFAULT_MODEL=gemini-2.5-flash-lite
 ```
 
 You can also leave `.env` empty and paste the API key directly into the app sidebar. API keys entered in the UI are not included in the DOCX export.

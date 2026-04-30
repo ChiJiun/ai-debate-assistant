@@ -11,8 +11,8 @@ import requests
 load_dotenv()
 
 
-DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER", "OpenAI")
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", os.getenv("OPENAI_MODEL", "gpt-4.1-mini"))
+DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER", "Gemini")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", os.getenv("OPENAI_MODEL", "gemini-2.5-flash-lite"))
 
 
 PROVIDER_ENV_KEYS = {

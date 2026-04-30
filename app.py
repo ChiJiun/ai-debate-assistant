@@ -32,6 +32,8 @@ SECTION_LABELS = {
     "closing": "Closing Speeches",
 }
 
+SECTION_ORDER = list(SECTION_LABELS)
+
 MODEL_OPTIONS = {
     "OpenAI": [
         "gpt-4.1-mini",
@@ -111,6 +113,7 @@ def initialize_state() -> None:
     st.session_state.setdefault("generated_sections", {})
     st.session_state.setdefault("last_settings", {})
     st.session_state.setdefault("provider_model_options", {})
+    st.session_state.setdefault("selected_sections", SECTION_ORDER.copy())
     for key, value in DEFAULT_SKILL_TEMPLATES.items():
         st.session_state.setdefault(f"skill_template_{key}", value)
 
@@ -122,65 +125,90 @@ def generate_all(
     output_style: str,
     llm_config: LLMConfig,
     skill_templates: dict[str, str],
+    selected_sections: list[str],
 ) -> dict[str, str]:
     sections: dict[str, str] = {}
+    total_steps = len(selected_sections)
+    current_step = 0
+
+    def update_progress(text: str) -> None:
+        nonlocal current_step
+        current_step += 1
+        progress.progress(int((current_step - 1) / total_steps * 100), text=text)
 
     progress = st.progress(0, text="Analyzing motion...")
-    sections["motion_analysis"] = generate_motion_analysis(
-        motion,
-        side,
-        time_limit,
-        output_style,
-        llm_config,
-        skill_templates,
-    )
 
-    progress.progress(17, text="Building arguments...")
-    sections["arguments"] = generate_arguments(motion, side, time_limit, output_style, llm_config, skill_templates)
+    if "motion_analysis" in selected_sections:
+        update_progress("Analyzing motion...")
+        sections["motion_analysis"] = generate_motion_analysis(
+            motion,
+            side,
+            time_limit,
+            output_style,
+            llm_config,
+            skill_templates,
+        )
 
-    progress.progress(34, text="Writing constructive speeches...")
-    sections["constructive"] = generate_constructive_speeches(
-        motion,
-        side,
-        time_limit,
-        output_style,
-        llm_config,
-        skill_templates,
-    )
+    if "arguments" in selected_sections:
+        update_progress("Building arguments...")
+        sections["arguments"] = generate_arguments(motion, side, time_limit, output_style, llm_config, skill_templates)
 
-    progress.progress(51, text="Preparing cross-examination...")
-    sections["cross_examination"] = generate_cross_examination(
-        motion,
-        side,
-        time_limit,
-        output_style,
-        llm_config,
-        skill_templates,
-    )
+    if "constructive" in selected_sections:
+        update_progress("Writing constructive speeches...")
+        sections["constructive"] = generate_constructive_speeches(
+            motion,
+            side,
+            time_limit,
+            output_style,
+            llm_config,
+            skill_templates,
+        )
 
-    progress.progress(68, text="Drafting defense answers...")
-    sections["defense"] = generate_defense_answers(motion, side, time_limit, output_style, llm_config, skill_templates)
+    if "cross_examination" in selected_sections:
+        update_progress("Preparing cross-examination...")
+        sections["cross_examination"] = generate_cross_examination(
+            motion,
+            side,
+            time_limit,
+            output_style,
+            llm_config,
+            skill_templates,
+        )
 
-    previous_materials = "\n\n".join(sections.values())
-    progress.progress(85, text="Writing closing speeches...")
-    sections["closing"] = generate_closing_speeches(
-        motion,
-        side,
-        time_limit,
-        output_style,
-        previous_materials,
-        llm_config,
-        skill_templates,
-    )
+    if "defense" in selected_sections:
+        update_progress("Drafting defense answers...")
+        sections["defense"] = generate_defense_answers(
+            motion,
+            side,
+            time_limit,
+            output_style,
+            llm_config,
+            skill_templates,
+        )
+
+    if "closing" in selected_sections:
+        update_progress("Writing closing speeches...")
+        previous_materials = "\n\n".join(sections.values()) or "No previous sections were selected."
+        sections["closing"] = generate_closing_speeches(
+            motion,
+            side,
+            time_limit,
+            output_style,
+            previous_materials,
+            llm_config,
+            skill_templates,
+        )
 
     progress.progress(100, text="Done.")
     return sections
 
 
 def render_sections(sections: dict[str, str]) -> None:
-    for key, title in SECTION_LABELS.items():
-        with st.expander(title, expanded=True):
-            st.markdown(sections.get(key, ""))
+    for key in SECTION_ORDER:
+        if key not in sections:
+            continue
+        with st.expander(SECTION_LABELS[key], expanded=True):
+            st.markdown(sections[key])
 
 
 def get_current_skill_templates() -> dict[str, str]:
@@ -202,10 +230,23 @@ with st.sidebar:
     output_style = st.selectbox("Output style", ["正式辯論", "課堂報告", "簡短口語"])
     research_mode = st.selectbox("Research mode", ["快速生成，不查資料", "之後保留：查資料模式"])
 
+    st.header("Generate")
+    selected_sections = st.multiselect(
+        "Materials to generate",
+        SECTION_ORDER,
+        default=st.session_state.selected_sections,
+        format_func=lambda value: SECTION_LABELS[value],
+        help="只產生需要的段落，可以省 API 額度並降低等待時間。",
+    )
+    st.session_state.selected_sections = selected_sections
+
     st.header("LLM")
+    providers = ["OpenAI", "Gemini", "Claude", "Grok", "DeepSeek", "Qwen", "OpenRouter", "Ollama"]
+    default_provider_index = providers.index(DEFAULT_PROVIDER) if DEFAULT_PROVIDER in providers else providers.index("Gemini")
     provider = st.selectbox(
         "LLM provider",
-        ["OpenAI", "Gemini", "Claude", "Grok", "DeepSeek", "Qwen", "OpenRouter", "Ollama"],
+        providers,
+        index=default_provider_index,
         format_func=lambda value: PROVIDER_LABELS[value],
         help="先選 LLM 供應商，再選該供應商可用的模型。",
     )
@@ -304,6 +345,8 @@ if research_mode != "快速生成，不查資料":
 if generate_clicked:
     if not motion.strip():
         st.warning("Please enter a debate motion first.")
+    elif not selected_sections:
+        st.warning("Please select at least one material to generate.")
     else:
         settings = {
             "Motion": motion.strip(),
@@ -313,6 +356,7 @@ if generate_clicked:
             "Research Mode": research_mode,
             "LLM Provider": provider,
             "Model": model,
+            "Generated Materials": ", ".join(SECTION_LABELS[key] for key in selected_sections),
             "Skill Template": "Customizable JSON",
         }
         llm_config = LLMConfig(
@@ -330,6 +374,7 @@ if generate_clicked:
                     output_style,
                     llm_config,
                     get_current_skill_templates(),
+                    selected_sections,
                 )
                 st.session_state.last_settings = settings
             st.success("Debate materials generated.")
