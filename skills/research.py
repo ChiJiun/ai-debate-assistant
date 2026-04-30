@@ -10,7 +10,6 @@ def generate_search_queries(
     side: str,
     user_material: str,
     llm_config: LLMConfig,
-    query_count: int = 5,
 ) -> str:
     context = debate_context(motion, side)
     task = f"""
@@ -19,7 +18,8 @@ def generate_search_queries(
     使用者資料：
     {user_material or "無"}
 
-    請只輸出 {query_count} 行搜尋關鍵字。
+    請自行判斷需要搜尋幾組關鍵字，通常 3 到 7 組即可。
+    請只輸出搜尋關鍵字。
     不要輸出分析、標題、編號、Markdown、解釋或其他文字。
 
     要求：
@@ -62,7 +62,6 @@ def run_research_workflow(
     user_material: str,
     llm_config: LLMConfig,
     tavily_key: str,
-    query_count: int,
     max_results: int,
     time_range: str,
     search_depth: str,
@@ -72,10 +71,9 @@ def run_research_workflow(
         side,
         user_material,
         llm_config,
-        query_count=query_count,
     )
     queries = [line.strip().removeprefix("-").strip() for line in raw_queries.splitlines() if line.strip()]
-    queries = queries[:query_count]
+    queries = queries[:10]
 
     material_parts: list[str] = []
     source_lines: list[str] = []

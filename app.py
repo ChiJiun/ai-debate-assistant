@@ -234,14 +234,6 @@ with tab_research:
         height=180,
     )
     st.caption("自動流程：LLM 只產生搜尋關鍵字 → Tavily 搜尋 → LLM 整理查詢結果。")
-    query_count = st.number_input(
-        "LLM 產生搜尋關鍵字數量",
-        min_value=1,
-        max_value=10,
-        value=5,
-        step=1,
-        help="LLM 會產生幾組乾淨關鍵字交給 Tavily 搜尋。",
-    )
     max_results = st.number_input(
         "每組關鍵字搜尋結果數量",
         min_value=1,
@@ -277,7 +269,6 @@ with tab_research:
                     st.session_state.manual_material,
                     llm_config,
                     tavily_key,
-                    query_count=int(query_count),
                     max_results=int(max_results),
                     time_range=time_range_map[time_range_label],
                     search_depth=search_depth_map[search_depth_label],
