@@ -157,7 +157,15 @@ with st.sidebar:
     st.header("基本設定")
     motion = st.text_area("辯題", key="motion", height=90)
     side = st.radio("你的立場", ["正方", "反方"], key="side", horizontal=True)
-    time_limit = st.selectbox("申論與結辯時間", ["1 分鐘", "2 分鐘", "3 分鐘"], index=2)
+    speech_minutes = st.number_input(
+        "申論與結辯時間（分鐘）",
+        min_value=0.5,
+        max_value=10.0,
+        value=3.0,
+        step=0.5,
+        help="可自行輸入或用步進調整。時間設定只套用在申論稿與結辯稿。",
+    )
+    time_limit = f"{speech_minutes:g} 分鐘"
     st.caption("時間設定只套用在申論稿與結辯稿；質詢與答辯以一來一回的短問答為主。")
 
     st.header("LLM 設定")
@@ -255,12 +263,16 @@ with tab_research:
         value=st.session_state.search_queries or st.session_state.motion,
         height=140,
     )
-    max_results = st.slider("每組關鍵字搜尋結果數量", min_value=1, max_value=20, value=5)
-    time_range_label = st.selectbox(
-        "資料時間範圍",
-        ["不限", "過去一天", "過去一週", "過去一個月", "過去一年"],
-        index=0,
+    max_results = st.number_input(
+        "每組關鍵字搜尋結果數量",
+        min_value=1,
+        max_value=20,
+        value=5,
+        step=1,
+        help="Tavily 每組關鍵字最多取回多少筆結果。",
     )
+    time_range_options = ["不限", "過去一天", "過去一週", "過去一個月", "過去一年"]
+    time_range_label = st.selectbox("資料時間範圍", time_range_options, index=0)
     time_range_map = {
         "不限": "",
         "過去一天": "day",
@@ -268,9 +280,10 @@ with tab_research:
         "過去一個月": "month",
         "過去一年": "year",
     }
+    search_depth_options = ["快速", "標準", "進階"]
     search_depth_label = st.selectbox(
         "搜尋深度",
-        ["快速", "標準", "進階"],
+        search_depth_options,
         index=1,
         help="進階搜尋通常更完整，但可能較慢且消耗較多 Tavily 額度。",
     )
