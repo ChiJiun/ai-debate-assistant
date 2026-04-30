@@ -149,8 +149,33 @@ def combined_all_materials() -> str:
 
 def render_sources() -> None:
     if st.session_state.get("sources_text"):
-        with st.expander("來源資料", expanded=False):
-            st.markdown(st.session_state.sources_text)
+        st.markdown("### 來源資料")
+        for block in st.session_state.sources_text.split("\n\n## "):
+            normalized_block = block if block.startswith("## ") else f"## {block}"
+            lines = [line.strip() for line in normalized_block.splitlines() if line.strip()]
+            if not lines:
+                continue
+            heading = lines[0].removeprefix("## ").strip()
+            with st.expander(f"查詢：{heading}", expanded=False):
+                current_title = ""
+                current_url = ""
+                current_summary = ""
+                for line in lines[1:] + ["### END"]:
+                    if line.startswith("### "):
+                        if current_title:
+                            st.markdown(f"**{current_title}**")
+                            if current_url:
+                                st.markdown(f"[開啟來源]({current_url})")
+                            if current_summary:
+                                st.caption(current_summary)
+                            st.divider()
+                        current_title = line.removeprefix("### ").strip()
+                        current_url = ""
+                        current_summary = ""
+                    elif line.startswith("連結："):
+                        current_url = line.removeprefix("連結：").strip()
+                    elif line.startswith("摘要："):
+                        current_summary = line.removeprefix("摘要：").strip()
 
 
 initialize_state()
@@ -300,12 +325,10 @@ with tab_research:
         with st.expander("LLM 提供給 Tavily 的搜尋關鍵字", expanded=False):
             st.code(st.session_state.search_queries)
     if st.session_state.search_material:
-        st.markdown("### 查詢結果")
-        st.markdown(st.session_state.search_material)
+        render_sources()
     if st.session_state.research_summary:
         st.markdown("### 資料整理")
         st.markdown(st.session_state.research_summary)
-    render_sources()
 
 with tab_constructive:
     st.subheader("申論")

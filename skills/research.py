@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from utils.openai_client import LLMConfig, generate_text
 from utils.prompts import debate_context, section_prompt
-from utils.research_client import format_search_results, search_tavily
+from utils.research_client import format_search_results, format_source_cards, search_tavily
 from utils.skill_catalog import get_skill_prompt
 
 
@@ -48,7 +48,7 @@ def run_research_workflow(
     queries = queries[:10]
 
     material_parts: list[str] = []
-    source_lines: list[str] = []
+    source_card_parts: list[str] = []
     for query in queries:
         results = search_tavily(
             query,
@@ -58,10 +58,10 @@ def run_research_workflow(
             search_depth=search_depth,
         )
         material_parts.append(f"## 查詢：{query}\n{format_search_results(results)}")
-        source_lines.extend(f"- [{result.title}]({result.url})" for result in results if result.url)
+        source_card_parts.append(format_source_cards(query, results))
 
     search_material = "\n\n".join(material_parts)
-    source_text = "\n".join(source_lines)
+    source_text = "\n\n".join(source_card_parts)
     summary = summarize_research(
         motion,
         side,

@@ -73,3 +73,17 @@ def format_search_results(results: list[SearchResult]) -> str:
         lines.append(f"摘要: {result.content}")
         lines.append("")
     return "\n".join(lines).strip()
+
+
+def format_source_cards(query: str, results: list[SearchResult]) -> str:
+    if not results:
+        return f"## {query}\n\n沒有搜尋結果。"
+
+    lines = [f"## {query}"]
+    for index, result in enumerate(results, start=1):
+        lines.append(f"### {index}. {result.title}")
+        lines.append(f"連結：{result.url}")
+        if result.content:
+            lines.append(f"摘要：{result.content}")
+        lines.append("")
+    return "\n".join(lines).strip()
