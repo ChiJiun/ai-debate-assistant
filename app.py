@@ -97,10 +97,15 @@ def initialize_state() -> None:
 
 def show_actionable_error(error: Exception, context: str) -> None:
     title, explanation, suggestion = explain_error(error)
-    with st.error(f"{context}：{title}"):
-        st.markdown(f"**這是什麼錯誤：** {title}")
-        st.markdown(f"**錯誤說明：** {explanation}")
-        st.markdown(f"**建議處理方式：** {suggestion}")
+    raw_message = " ".join(str(error).split())
+    if len(raw_message) > 700:
+        raw_message = raw_message[:697] + "..."
+
+    st.error(f"{context}：{title}")
+    st.markdown(f"**這是什麼錯誤：** {title}")
+    st.markdown(f"**錯誤說明：** {explanation}")
+    st.markdown(f"**原始錯誤訊息：** `{raw_message or '無原始錯誤訊息'}`")
+    st.markdown(f"**建議處理方式：** {suggestion}")
 
 
 def render_google_ai_studio_guide() -> None:
@@ -374,6 +379,7 @@ with tab_constructive:
 
 with tab_questioning:
     st.subheader("質詢")
+    st.caption("左邊生成可用問題，右邊進行多輪質詢練習。")
     st.session_state.opponent_constructive = st.text_area(
         "對方申論稿 / 對方資料",
         value=st.session_state.opponent_constructive,
@@ -381,6 +387,7 @@ with tab_questioning:
     )
     col_questions, col_simulation = st.columns(2)
     with col_questions:
+        st.markdown("### 生成質詢素材")
         if st.button("生成質詢問題", use_container_width=True):
             try:
                 st.session_state.questioning = generate_questioning(
@@ -393,10 +400,10 @@ with tab_questioning:
                 st.success("質詢問題生成完成。")
             except Exception as exc:
                 show_actionable_error(exc, "生成質詢問題失敗")
-        if st.session_state.questioning:
-            st.markdown(st.session_state.questioning)
+        st.text_area("質詢問題", key="questioning", height=260)
 
     with col_simulation:
+        st.markdown("### 多輪質詢練習")
         question = st.text_area("輸入你要問對方的質詢問題 / 下一輪追問", height=130)
         if st.button("送出本輪質詢", use_container_width=True):
             try:
@@ -431,49 +438,53 @@ with tab_questioning:
 
 with tab_defense:
     st.subheader("答辯")
+    st.caption("左邊生成可用答辯，右邊進行多輪答辯練習。")
     defense_question = st.text_area("輸入你被質詢的問題", height=130)
     col_defense, col_followup = st.columns(2)
     with col_defense:
-        if st.button("生成本輪答辯", use_container_width=True):
+        st.markdown("### 生成答辯素材")
+        if st.button("生成答辯內容", use_container_width=True):
             try:
-                defense = generate_defense(
+                st.session_state.defense = generate_defense(
                     st.session_state.motion,
                     st.session_state.side,
                     defense_question,
+                    combined_all_materials(),
+                    st.session_state.defense_dialogue,
+                    llm_config,
+                )
+                st.success("答辯生成完成。")
+            except Exception as exc:
+                show_actionable_error(exc, "生成答辯失敗")
+        st.text_area("答辯內容", key="defense", height=260)
+
+    with col_followup:
+        st.markdown("### 多輪答辯練習")
+        user_answer = st.text_area("輸入你剛剛實際回答的內容，讓對方繼續追問", height=200)
+        if st.button("產生對方下一輪追問", use_container_width=True):
+            try:
+                answer_for_followup = user_answer or st.session_state.defense
+                followup = generate_defense_followup(
+                    st.session_state.motion,
+                    st.session_state.side,
+                    defense_question,
+                    answer_for_followup,
                     combined_all_materials(),
                     st.session_state.defense_dialogue,
                     llm_config,
                 )
                 round_number = st.session_state.defense_dialogue.count("## 第") + 1
-                st.session_state.defense = defense
                 st.session_state.defense_dialogue = append_dialogue(
                     st.session_state.defense_dialogue,
                     f"第 {round_number} 輪答辯",
-                    defense,
-                )
-                st.success("答辯生成完成。")
-            except Exception as exc:
-                show_actionable_error(exc, "生成答辯失敗")
-        st.text_area("本輪答辯內容", key="defense", height=260)
-
-    with col_followup:
-        user_answer = st.text_area("輸入你剛剛實際回答的內容，讓對方繼續追問", height=200)
-        if st.button("產生對方下一輪追問", use_container_width=True):
-            try:
-                followup = generate_defense_followup(
-                    st.session_state.motion,
-                    st.session_state.side,
-                    defense_question,
-                    user_answer or st.session_state.defense,
-                    combined_all_materials(),
-                    st.session_state.defense_dialogue,
-                    llm_config,
-                )
-                round_number = st.session_state.defense_dialogue.count("## 對方第") + 1
-                st.session_state.defense_dialogue = append_dialogue(
-                    st.session_state.defense_dialogue,
-                    f"對方第 {round_number} 次追問",
-                    followup,
+                    "\n".join(
+                        part
+                        for part in [
+                            f"- 我方本輪回答：{answer_for_followup}",
+                            followup,
+                        ]
+                        if part.strip()
+                    ),
                 )
                 st.success("對方追問生成完成。")
             except Exception as exc:
