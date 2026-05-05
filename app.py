@@ -267,6 +267,7 @@ with st.sidebar:
 
     st.header("Skills")
     st.caption("這裡顯示各功能目前使用的 prompt 與主要用途。")
+    st.info("可以把下方 prompt 複製到 ChatGPT、Gemini、Claude 或其他 AI 工具中使用；如果你有更好的模型，也不一定要透過 API。")
     for skill in SKILLS.values():
         with st.expander(skill.name, expanded=False):
             st.markdown(f"**主要功用：** {skill.purpose}")
