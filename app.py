@@ -268,6 +268,20 @@ with st.sidebar:
     st.header("Skills")
     st.caption("這裡顯示各功能目前使用的 prompt 與主要用途。")
     st.info("可以把下方 prompt 複製到 ChatGPT、Gemini、Claude 或其他 AI 工具中使用；如果你有更好的模型，也不一定要透過 API。")
+    with st.expander("Prompt 變數說明", expanded=False):
+        st.markdown(
+            """
+            `{motion}`：辯題  
+            `{side}`：你的立場  
+            `{user_material}`：你在「貼上資料」欄位輸入的資料  
+            `{source_material}`：貼上資料、查詢結果與資料整理  
+            `{opponent_material}`：對方申論或對方資料  
+            `{question}`：質詢問題或被質詢問題  
+            `{answer}`：你的答辯回答  
+            `{dialogue_history}`：多輪質詢或答辯紀錄  
+            `{materials}`：結辯會用到的整合資料
+            """
+        )
     for skill in SKILLS.values():
         with st.expander(skill.name, expanded=False):
             st.markdown(f"**主要功用：** {skill.purpose}")
