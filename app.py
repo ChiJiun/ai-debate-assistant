@@ -108,23 +108,6 @@ def show_actionable_error(error: Exception, context: str) -> None:
     st.markdown(f"**建議處理方式：** {suggestion}")
 
 
-def render_google_ai_studio_guide() -> None:
-    with st.expander("Google AI Studio 免費使用教學", expanded=False):
-        st.markdown(
-            """
-            1. 前往 [Google AI Studio](https://aistudio.google.com/) 並登入 Google 帳號。
-            2. 點 **Get API key** 或 **API keys**，建立新的 Gemini API key。
-            3. 回到本 app，選擇 **LLM provider: Gemini / Google AI Studio**。
-            4. 將 API key 貼到側邊欄的 **API key** 欄位。
-            5. 點 **Refresh available models**，從下拉選單選可用模型。
-            6. 建議先試 `gemini-2.5-flash-lite`。
-            7. Gemini 2 系列模型 ID 是 `gemini-2.0-...`，不是 `gemini-2-...`。
-
-            常見錯誤：`429` 是額度限制、`404` 是模型不可用、`503` 是模型暫時太忙。
-            """
-        )
-
-
 def build_llm_config(provider: str, model: str, api_key: str, base_url: str) -> LLMConfig:
     return LLMConfig(provider=provider, model=model, api_key=api_key, base_url=base_url)
 
@@ -201,7 +184,6 @@ initialize_state()
 
 st.title("辯論助理")
 st.caption("查資料、寫申論、設計質詢、準備答辯、生成結辯。")
-render_google_ai_studio_guide()
 
 with st.sidebar:
     st.header("基本設定")
@@ -222,6 +204,16 @@ with st.sidebar:
     providers = ["OpenAI", "Gemini", "Claude", "Grok", "DeepSeek", "Qwen", "OpenRouter", "Ollama"]
     default_provider_index = providers.index(DEFAULT_PROVIDER) if DEFAULT_PROVIDER in providers else 1
     provider = st.selectbox("LLM provider", providers, index=default_provider_index, format_func=lambda x: PROVIDER_LABELS[x])
+    if provider == "Gemini":
+        with st.expander("Google AI Studio API key 教學", expanded=False):
+            st.markdown(
+                """
+                1. 開啟 [Google AI Studio](https://aistudio.google.com/)。
+                2. 點 **Get API key**，建立 Gemini API key。
+                3. 回到這裡，把 key 貼到下方 **API key** 欄位。
+                4. 模型建議先選 `gemini-2.5-flash-lite`。
+                """
+            )
 
     default_key = get_default_api_key(provider)
     api_key = ""
@@ -286,13 +278,15 @@ tab_research, tab_constructive, tab_questioning, tab_defense, tab_closing, tab_e
 )
 
 with tab_research:
-    st.subheader("查詢資料")
+    st.subheader("查詢資料 / 貼上資料")
+    st.caption("這裡可以手動貼資料，也可以用 Tavily 上網查資料；後續申論、質詢、答辯與結辯會使用這裡的資料。")
     st.session_state.manual_material = st.text_area(
-        "手動貼上資料、課本內容、新聞摘要或你已經整理好的素材",
+        "貼上資料（課本內容、新聞摘要、網站文字、你已整理好的素材）",
         value=st.session_state.manual_material,
         height=180,
+        help="即使不使用 Tavily 查資料，這裡貼上的內容也會被後續生成申論、質詢、答辯與結辯時納入上下文。",
     )
-    st.caption("自動流程：LLM 決定搜尋關鍵字與每組取回筆數 → Tavily 搜尋 → LLM 整理查詢結果。")
+    st.caption("自動查資料流程：LLM 決定搜尋關鍵字與每組取回筆數 → Tavily 搜尋 → LLM 整理查詢結果。")
     time_range_options = ["不限", "過去一天", "過去一週", "過去一個月", "過去一年"]
     time_range_label = st.selectbox("資料時間範圍", time_range_options, index=0)
     time_range_map = {
