@@ -274,12 +274,12 @@ with st.sidebar:
             `{motion}`：辯題  
             `{side}`：你的立場  
             `{user_material}`：你在「貼上資料」欄位輸入的資料  
-            `{source_material}`：貼上資料、查詢結果與資料整理  
+            `{source_material}`：貼上資料、Tavily 查詢結果、LLM 資料整理；申論、答辯等功能會用這包資料  
             `{opponent_material}`：對方申論或對方資料  
             `{question}`：質詢問題或被質詢問題  
             `{answer}`：你的答辯回答  
             `{dialogue_history}`：多輪質詢或答辯紀錄  
-            `{materials}`：結辯會用到的整合資料
+            `{materials}`：結辯用的整合資料，包含貼上資料、查詢資料、資料整理、我方申論、對方申論、質詢問題、質詢紀錄、答辯內容與答辯紀錄
             """
         )
     for skill in SKILLS.values():
